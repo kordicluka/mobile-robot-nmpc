@@ -1,0 +1,58 @@
+% !TEX root = ../zavrsni_rad.tex
+
+\chapter{Zaključak}
+\label{pog:zakljucak}
+
+\section{Pregled postignutih rezultata}
+
+U ovom radu razvijen je dvoslojni sustav za planiranje i praćenje putanje mobilnog robota u poznatom statičkom prostoru. Globalni sloj temelji se na A* algoritmu koji pretražuje diskretiziranu mrežu rezolucije $0{,}2$ m uz ukupnu inflaciju prepreka $0{,}4$ m, a dobivena putanja se izglađuje uz prilagodbu brzine zakrivljenosti. Lokalni sloj koristi NMPC regulator s proširenim modelom jednokolice i SQP\_RTI solverom koji na svakom uzorkovnom koraku od $\Delta t = 0{,}1$ s rješava OCP s horizontom $N = 20$ koraka.
+
+Sustav je testiran na sedam scenarija koji pokrivaju spektar od jednostavne ravne putanje do gusto popunjene okoline i namjerno zadanog poremećaja stanja. Svi scenariji završili su uspješnim dosezanjem cilja, s RMSE od $34{,}4$ do $72{,}4$ mm u statičkim scenarijima i prosječnim CPU vremenom od $0{,}089$ do $0{,}118$ ms po koraku.
+
+\section{Analiza ključnih nalaza}
+
+\subsection*{Preciznost praćenja i utjecaj geometrije okoline}
+
+Rezultati pokazuju da preciznost praćenja nije monotono određena brojem prepreka, nego geometrijom putanje koju prepreke nameću. Scenarij s jednom preprekom (RMSE $= 46{,}9$ mm) postiže lošiji rezultat od gustog rasporeda sedam prepreka (RMSE $= 42{,}9$ mm), jer raspoređene prepreke u potonjem slučaju dopuštaju glatku dijagonalnu trajektoriju, dok jedna prepreka u nepovoljnom položaju prisiljava na oštriji zaokret. Scenariji s hodnicima (L-hodnik, U-oblik) s RMSE od $72{,}4$ mm i $55{,}0$ mm postavljaju najveći zahtjev jer oblik hodnika nameće skretanja blizu $90°$.
+
+\subsection*{Automatski oporavak od poremećaja}
+
+Scenarij perturbacije pokazuje prednost MPC arhitekture: oporavak od poremećaja nije posebno kodiran, već je prirodna posljedica zatvorene optimizacijske petlje. Nagli pomak od $\Delta y = 1{,}0$ m kompenziran je unutar $2{,}2$ s ($22$ koraka) bez ikakvih modifikacija sustava. Sustav na svakom koraku prima stvarno stanje i rješava OCP prema naprijed, pa automatski ispravlja grešku bez posebne logike za oporavak.
+
+\subsection*{Računalna provedivost}
+
+Prosječno CPU vrijeme kreće se od $0{,}089$ do $0{,}118$ ms po koraku, što je daleko ispod uzornog intervala od $100$ ms. Zanimljiv nalaz je da CPU prosjek ne ovisi izravno o broju prepreka: scenarij poremećaja bez prepreka postiže najviši prosjek ($0{,}118$ ms) zbog intenzivnih korektivnih iteracija, dok gusti raspored sedam prepreka iznosi $0{,}107$ ms. Topologija putanje i dinamika stanja imaju veći utjecaj na računalni teret od broja mekih ograničenja.
+
+\subsection*{Analiza osjetljivosti parametara}
+
+Analiza horizonta $N$ otkriva zasićenje preciznosti za $N \geq 10$ (RMSE $\approx 43$--$47$ mm), dok CPU raste gotovo linearno. Odabrani $N = 20$ ($0{,}305$ ms/korak) postiže $33$\% manji CPU od $N = 30$ uz manje od $3$ mm razlike u RMSE. Analiza pondera $Q/R$ pokazuje da što je $Q$ veći u odnosu na $R$, robot preciznije prati putanju. Konfiguracija Q$<$R rezultira najlošijim RMSE ($272{,}9$ mm) jer robot tada više kažnjava agresivno skretanje nego grešku pozicije.
+
+\section{Ograničenja implementiranog sustava}
+
+Implementirani sustav počiva na nekoliko pretpostavki koje ograničavaju izravnu primjenjivost u stvarnim scenarijima:
+
+\textbf{Poznata i statička okolina.} A* algoritam zahtijeva potpunu kartu okoline unaprijed. U dinamičkim okolinama s pokretnim preprekama potrebna je integracija senzorskog sustava i reaktivno replaniranje.
+
+\textbf{Kinematički model bez dinamike.} Model jednokolice zanemaruje inerciju i trenje kotača. Na visokim brzinama ili klizavim podlogama ova aproksimacija nije valjana i zahtijeva dinamički model.
+
+\textbf{Kružne prepreke.} Implementirana ograničenja prepreka pretpostavljaju kružni oblik. Prepreke proizvoljnog oblika zahtijevaju konveksnu aproksimaciju poligona ili pristup temeljen na polju predznačenih udaljenosti (SDF).
+
+\textbf{Simulacijsko okruženje.} Svi rezultati dobiveni su u simulaciji. Stvarni robot ima šum senzora, kašnjenje motora i trenje koje simulacija ne uključuje, pa su rezultati u praksi nešto lošiji.
+
+\section{Smjernice za buduća istraživanja}
+
+Na temelju postignutih rezultata i identificiranih ograničenja, predlažu se sljedeće smjernice za daljnji razvoj:
+
+\begin{enumerate}
+  \item \textbf{Dinamičke prepreke i reaktivno replaniranje:} implementacija A* ponovnog planiranja putanje u stvarnom vremenu pri detekciji novih prepreka
+  \item \textbf{Dinamički model robota:} uključivanje inercije i trenja u model kako bi simulacija bila bliža stvarnom ponašanju robota
+  \item \textbf{Contouring MPC:} varijanta NMPC-a koja kažnjava bočno odstupanje i brzinu napredovanja po putanji umjesto praćenja diskretnih referentnih točaka~\cite{cmpc}
+  \item \textbf{Adaptivno podešavanje:} automatsko prilagođavanje pondera $Q$ i $R$ ovisno o trenutnoj situaciji, npr.\ agresivnije u zavojima i glađe na ravnom dijelu putanje
+  \item \textbf{Testiranje na stvarnom hardveru:} pokretanje sustava na Raspberry Pi ili sličnom računalu kako bi se potvrdilo da radi dovoljno brzo u stvarnim uvjetima
+\end{enumerate}
+
+\section{Završna ocjena}
+
+Kombinacija A* algoritma i NMPC-a pokazala se kao dobro rješenje za navigaciju mobilnog robota --- sustav precizno prati putanju, automatski se oporavlja od poremećaja i radi dovoljno brzo za primjenu u stvarnom vremenu. Za razliku od jednostavnijih regulatora koji reagiraju tek nakon što se greška dogodi, NMPC gleda unaprijed i pokušava spriječiti grešku dok se još može.
+
+Alat acados pri tome generira optimizirani kod automatski, što znači da nije potrebno duboko poznavanje numeričke matematike da bi se ovakav sustav implementirao. 

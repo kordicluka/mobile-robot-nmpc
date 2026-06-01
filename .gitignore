@@ -1,0 +1,29 @@
+# LaTeX build artifacts
+latex/*.aux
+latex/*.bbl
+latex/*.blg
+latex/*.log
+latex/*.out
+latex/*.toc
+latex/*.synctex.gz
+latex/poglavlja/*.aux
+latex/_minted-*/
+
+# acados build artifacts
+.acados_build/
+c_generated_code/
+acados_ocp.json
+
+# Editor
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# Results (large files)
+results/figures/*.png
+results/figures/*.gif
+results/data/*.csv

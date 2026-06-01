@@ -1,0 +1,30 @@
+astar:
+  grid_resolution: 0.2
+  obstacle_inflation: 0.2
+environment:
+  x_max: 10.0
+  x_min: 0.0
+  y_max: 10.0
+  y_min: 0.0
+mpc:
+  N: 20
+  Q:
+  - 10.0
+  - 10.0
+  - 1.0
+  R:
+  - 0.1
+  - 0.1
+  constraints: soft
+  dt: 0.1
+  solver_type: SQP_RTI
+robot:
+  domega_max: 1.0
+  dv_max: 0.5
+  omega_max: 1.5
+  radius: 0.2
+  v_max: 1.0
+  v_min: 0.05
+simulation:
+  goal_tolerance: 0.3
+  max_steps: 1000

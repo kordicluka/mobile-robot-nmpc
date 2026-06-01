@@ -1,0 +1,102 @@
+% !TEX root = ../zavrsni_rad.tex
+
+\chapter{Model mobilnog robota}
+\label{pog:model}
+
+\section{Kinematički model jednokolice}
+
+Robot je modeliran kao jednokolica --- najjednostavniji model dvodimenzionalnog kretanja. Model koristi translacijsku brzinu $v$ i kutnu brzinu $\omega$ kao apstrakciju kretanja, što ga čini prikladnim za diferencijalno upravljane robote poput robotskog usisavača gdje se smjer kretanja postiže razlikom brzina dva kotača.
+Stanje robota opisano je s pet veličina:
+
+\begin{equation}
+  \mathbf{x} = \begin{bmatrix} x \\ y \\ \theta \\ v \\ \omega \end{bmatrix}
+\end{equation}
+
+gdje su $x$ i $y$ koordinate robota u prostoru, $\theta$ kut orijentacije (mjeren od osi $x$, od $-\pi$ do $\pi$), $v$ translacijska brzina i $\omega$ kutna brzina.
+
+Jednadžbe kretanja su:
+
+\begin{equation}
+  \dot{x} = v\cos\theta, \qquad \dot{y} = v\sin\theta, \qquad \dot{\theta} = \omega
+\end{equation}
+
+Ovo su standardne jednadžbe jednokolice. Robot se može kretati samo naprijed-nazad u smjeru u koji je okrenut --- ne može bočno. Zbog toga, ako se robot odmakne od referentne putanje, ne može jednostavno skliznuti natrag, nego mora okretanjem i vožnjom postupno korigirati poziciju i orijentaciju.
+
+\section{Prošireni model s inkrementalnim upravljanjem}
+
+U osnovnom modelu jednokolice upravljačke veličine su direktno brzine $v$ i $\omega$. Međutim, u praksi robot ne može trenutačno promijeniti brzinu --- postoje fizikalna ograničenja na to koliko brzo se brzina može mijenjati. Ako bismo ta ograničenja pokušali direktno implementirati u NMPC-u s $v$ i $\omega$ kao upravljanjem, formulacija postaje komplicirana.
+
+Rješenje je jednostavno: umjesto da upravljamo direktno brzinama, upravljamo njihovim \textbf{promjenama} $\Delta v$ i $\Delta\omega$. Brzine $v$ i $\omega$ postaju dio vektora stanja, a upravljački vektor postaje:
+
+\begin{equation}
+  \mathbf{u} = \begin{bmatrix} \Delta v \\ \Delta\omega \end{bmatrix}
+\end{equation}
+
+Cijeli vektor stanja sada ima pet komponenti, a dinamika proširenog modela glasi:
+
+\begin{equation}
+  \dot{\mathbf{x}} = f(\mathbf{x}, \mathbf{u}) =
+  \begin{bmatrix}
+    v\cos\theta \\
+    v\sin\theta \\
+    \omega \\
+    \Delta v \\
+    \Delta\omega
+  \end{bmatrix}
+\end{equation}
+
+Prednost ovog pristupa je što ograničenja na brzinu promjene postaju jednostavna intervalna ograničenja na upravljanje:
+
+\begin{equation}
+  |\Delta v| \leq 0{,}5 \ \text{m/s}^2, \qquad |\Delta\omega| \leq 1{,}0 \ \text{rad/s}^2
+\end{equation}
+
+A ograničenja na same iznose brzina postaju intervalna ograničenja na stanja:
+
+\begin{equation}
+  0{,}05 \leq v \leq 1{,}0 \ \text{m/s}, \qquad |\omega| \leq 1{,}5 \ \text{rad/s}
+\end{equation}
+
+Minimalna brzina $v_{min} = 0{,}05$ m/s osigurava da robot uvijek napreduje prema cilju --- bez te granice, optimizator bi u složenim situacijama mogao odabrati zaustavljanje kao lokalni optimum i robot bi zaostao iza referentne putanje koja kontinuirano napreduje.
+
+Implementacija modela koristi CasADi --- biblioteku za simboličku matematiku. Umjesto računanja s konkretnim brojevima, CasADi radi sa simboličkim varijablama poput $x$, $\theta$, $v$ iz kojih automatski izvodi derivacije potrebne za optimizaciju. To znači da dinamički model trebamo napisati samo jednom, a acados iz njega sam generira optimizirani C kod solvera bez ručnog računanja Jacobijana. Alternativa bi bila ručno izvođenje parcijalnih derivacija, no CasADi taj postupak čini bržim i jednostavnijim za promjene modela.
+
+\begin{listing}[H]
+\begin{minted}{python}
+model.x = ca.vertcat(x, y, theta, v, omega)
+model.u = ca.vertcat(dv, domega)
+
+model.f_expl_expr = ca.vertcat(
+    v * ca.cos(theta),   # dx/dt
+    v * ca.sin(theta),   # dy/dt
+    omega,               # dtheta/dt
+    dv,                  # dv/dt
+    domega,              # domega/dt
+)
+\end{minted}
+\caption{Implementacija proširenog modela jednokolice u \texttt{src/model.py}}
+\end{listing}
+
+\section{Numerička integracija — metoda Runge-Kutta 4. reda}
+
+NMPC regulator interno rješava optimizacijski problem, ali nam je potrebna i odvojena numerička metoda za simulaciju "pravog robota" koji slijedi upravljačke naredbe. U tu svrhu koristi se metoda Runge-Kutta 4. reda (RK4).
+
+RK4 aproksimira kretanje robota kroz jedan vremenski korak $\Delta t = 0{,}1$ s na sljedeći način:
+
+\begin{equation}
+  k_1 = f(\mathbf{x}_k, \mathbf{u}_k)
+\end{equation}
+\begin{equation}
+  k_2 = f\!\left(\mathbf{x}_k + \tfrac{\Delta t}{2}k_1,\ \mathbf{u}_k\right)
+\end{equation}
+\begin{equation}
+  k_3 = f\!\left(\mathbf{x}_k + \tfrac{\Delta t}{2}k_2,\ \mathbf{u}_k\right)
+\end{equation}
+\begin{equation}
+  k_4 = f(\mathbf{x}_k + \Delta t\, k_3,\ \mathbf{u}_k)
+\end{equation}
+\begin{equation}
+  \mathbf{x}_{k+1} = \mathbf{x}_k + \frac{\Delta t}{6}(k_1 + 2k_2 + 2k_3 + k_4)
+\end{equation}
+
+RK4 je odabran kao standardna metoda numeričke integracije koja se široko koristi u simulacijama dinamičkih sustava. Tijekom razvoja testirana je i Eulerova metoda, no rezultati su bili gotovo identični RK4-u, a ponekad s većim odstupanjima nego što bi teorija sugerirala. Iz tog razloga u konačnoj implementaciji zadržan je samo RK4. Implementacija u \texttt{src/simulation.py} direktno odgovara gornjim jednadžbama i koristi isti $f$ kao i model definiran u \texttt{src/model.py}, čime je osigurana konzistentnost između simulacije i predikcijskog modela u NMPC-u.
