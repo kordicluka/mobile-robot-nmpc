@@ -59,7 +59,7 @@ A ograničenja na same iznose brzina postaju intervalna ograničenja na stanja:
 
 Minimalna brzina $v_{min} = 0{,}05$ m/s osigurava da robot uvijek napreduje prema cilju --- bez te granice, optimizator bi u složenim situacijama mogao odabrati zaustavljanje kao lokalni optimum i robot bi zaostao iza referentne putanje koja kontinuirano napreduje.
 
-Implementacija modela koristi CasADi --- biblioteku za simboličku matematiku. Umjesto računanja s konkretnim brojevima, CasADi radi sa simboličkim varijablama poput $x$, $\theta$, $v$ iz kojih automatski izvodi derivacije potrebne za optimizaciju. To znači da dinamički model trebamo napisati samo jednom, a acados iz njega sam generira optimizirani C kod solvera bez ručnog računanja Jacobijana. Alternativa bi bila ručno izvođenje parcijalnih derivacija, no CasADi taj postupak čini bržim i jednostavnijim za promjene modela.
+Implementacija modela koristi CasADi \cite{casadi} --- biblioteku za simboličku matematiku. Umjesto računanja s konkretnim brojevima, CasADi radi sa simboličkim varijablama poput $x$, $\theta$, $v$ iz kojih automatski izvodi derivacije potrebne za optimizaciju. To znači da dinamički model trebamo napisati samo jednom, a acados iz njega sam generira optimizirani C kod solvera bez ručnog računanja Jacobijana. Alternativa bi bila ručno izvođenje parcijalnih derivacija, no CasADi taj postupak čini bržim i jednostavnijim za promjene modela.
 
 \begin{listing}[H]
 \begin{minted}{python}

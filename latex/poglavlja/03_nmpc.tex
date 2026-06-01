@@ -145,11 +145,11 @@ ocp.cost.Zl = penalty * np.ones(n_obs)        # kvadratni penalty
 
 \section{SQP\_RTI solver}
 
-Za rješavanje nelinearnog optimizacijskog problema na svakom koraku koristi se SQP\_RTI (\textit{Sequential Quadratic Programming --- Real-Time Iteration}) pristup unutar alata acados \cite{acados}.
+Za rješavanje nelinearnog optimizacijskog problema na svakom koraku koristi se SQP\_RTI (\textit{Sequential Quadratic Programming --- Real-Time Iteration}) pristup unutar alata acados \cite{acados_docs}.
 
-SQP (\textit{Sequential Quadratic Programming}) je metoda optimizacije koja iterativno linearizira nelinearni problem i rješava niz kvadratičnih potprograma. SQP\_RTI \cite{rti} je varijanta koja provodi \textbf{samo jednu iteraciju po koraku} i odmah primjenjuje rezultat, što ga čini pogodnim za primjene u stvarnom vremenu.
+SQP (\textit{Sequential Quadratic Programming}) je metoda optimizacije koja iterativno linearizira nelinearni problem i rješava niz kvadratičnih potprograma. SQP\_RTI je varijanta koja provodi \textbf{samo jednu iteraciju po koraku} i odmah primjenjuje rezultat, što ga čini pogodnim za primjene u stvarnom vremenu.
 
-Za rješavanje kvadratičnog potprograma unutar svake SQP iteracije koristi se HPIPM solver (\textit{High Performance Interior Point Method}) \cite{hpipm} koji je optimiziran za strukturu MPC problema. Gaussova aproksimacija Hessiane (\textit{Gauss-Newton}) zamjenjuje drugu derivatu troška pozitivno semidefinitnom aproksimacijom, što ubrzava rješavanje QP-a.
+Za rješavanje kvadratičnog potprograma unutar svake SQP iteracije koristi se HPIPM solver (\textit{High Performance Interior Point Method}) koji je optimiziran za strukturu MPC problema. Gaussova aproksimacija Hessiane (\textit{Gauss-Newton}) zamjenjuje drugu derivatu troška pozitivno semidefinitnom aproksimacijom, što ubrzava rješavanje QP-a.
 
 Ukupno vrijeme rješavanja po koraku izmjereno u eksperimentima iznosi između $0{,}09$ i $0{,}12$ ms --- daleko ispod vremenskog koraka od $100$ ms. Benchmarking je proveden s oba solvera (SQP\_RTI i SQP) te su u svim testiranim scenarijima postigli identične rezultate po RMSE i CPU vremenu.
 

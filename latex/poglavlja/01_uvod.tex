@@ -13,7 +13,7 @@ U ovom radu ta su dva problema riješena zajedno: izgrađen je sustav koji prvo 
 
 \subsection{Planiranje putanje}
 
-Razvoj algoritama za planiranje putanje mobilnih robota proteže se kroz nekoliko desetljeća istraživanja. Najraniji pristupi temelje se na pretraživanju grafova u diskretiziranom prostoru. Dijkstrin algoritam garantira optimalnost ali ne koristi heurističku informaciju o cilju. \textbf{A* algoritam} \cite{astar}, uveden 1968.\ godine, dodaje procjenu preostale udaljenosti do cilja --- ravnu liniju do cilja --- i time značajno ubrzava pretraživanje uz zadržavanje optimalnosti. A* se danas smatra standardnim rješenjem za planiranje putanje u poznatim okolinama. Istraživanjem stvarnih robotskih sustava utvrđeno je da je A* široko zastupljen u praksi --- koristi se za planiranje putanje u ROS-u (\textit{Robot Operating System}), standardnoj platformi istraživačke robotike.
+Razvoj algoritama za planiranje putanje mobilnih robota proteže se kroz nekoliko desetljeća istraživanja. Najraniji pristupi temelje se na pretraživanju grafova u diskretiziranom prostoru. Dijkstrin algoritam garantira optimalnost ali ne koristi heurističku informaciju o cilju. \textbf{A* algoritam} \cite{redblobgames_astar}, uveden 1968.\ godine, dodaje procjenu preostale udaljenosti do cilja --- ravnu liniju do cilja --- i time značajno ubrzava pretraživanje uz zadržavanje optimalnosti. A* se danas smatra standardnim rješenjem za planiranje putanje u poznatim okolinama. Istraživanjem stvarnih robotskih sustava utvrđeno je da je A* široko zastupljen u praksi --- koristi se za planiranje putanje u ROS-u (\textit{Robot Operating System}), standardnoj platformi istraživačke robotike.
 
 Algoritam je posebno dobro obrađen na kolegiju Uvod u umjetnu inteligenciju na FER-u, što je dodatno učvrstilo razumijevanje njegovih svojstava i olakšalo primjenu u ovom radu.
 
@@ -22,9 +22,9 @@ Algoritam je posebno dobro obrađen na kolegiju Uvod u umjetnu inteligenciju na 
 
 Problem praćenja putanje na prvi pogled izgleda jednostavno --- robot treba slijediti zadanu liniju. No mobilni robot poput jednokolice ima jedno ključno ograničenje: može se kretati samo u smjeru u koji je okrenut, ne i bočno. To znači da robot ne može jednostavno "skliznuti" na putanju ako se od nje odmakne, nego mora okretanjem i vožnjom naprijed postupno korigirati svoju poziciju i orijentaciju. Uz to, robot ima fizikalna ograničenja --- maksimalnu brzinu, maksimalnu kutnu brzinu i ograničenja na to koliko brzo može mijenjati te veličine.
 
-Za praćenje generirane putanje postoje razni pristupi --- geometrijski regulatori poput Pure Pursuit i Stanley regulatora \cite{siegwart_robotics}, PID regulatori i LQR. Svi su relativno jednostavni za implementaciju, ali zajednički im je nedostatak: ne gledaju unaprijed i ne uzimaju u obzir ograničenja sustava na formalan način.
+Za praćenje generirane putanje postoje razni pristupi --- geometrijski regulatori poput Pure Pursuit i Stanley regulatora, PID regulatori i LQR. Svi su relativno jednostavni za implementaciju, ali zajednički im je nedostatak: ne gledaju unaprijed i ne uzimaju u obzir ograničenja sustava na formalan način.
 
-\textbf{Modelsko prediktivno upravljanje} (MPC) \cite{rawlings_mpc} rješava upravo to: na svakom koraku gleda unaprijed kroz cijeli predikcijski horizont i optimizira upravljanje uz eksplicitno poštivanje svih ograničenja. \textbf{Nelinearno MPC} (NMPC) proširuje taj pristup na nelinearne sustave poput jednokolice. U ovom radu implementirano je korištenjem alata acados \cite{acados}.
+\textbf{Modelsko prediktivno upravljanje} (MPC) \cite{wiki_mpc} rješava upravo to: na svakom koraku gleda unaprijed kroz cijeli predikcijski horizont i optimizira upravljanje uz eksplicitno poštivanje svih ograničenja. \textbf{Nelinearno MPC} (NMPC) proširuje taj pristup na nelinearne sustave poput jednokolice. U ovom radu implementirano je korištenjem alata acados \cite{acados_docs}.
 
 \section{Doprinosi i opseg rada}
 
