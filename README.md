@@ -144,3 +144,42 @@ Svi parametri se mijenjaju u `config/params.yaml`:
 | `mpc.constraints` | `soft` (robusno) ili `hard` (strogo) |
 | `robot.v_max` | Maksimalna linearna brzina [m/s] |
 | `robot.omega_max` | Maksimalna kutna brzina [rad/s] |
+
+---
+
+## Prevođenje LaTeX dokumenta
+
+Završni rad nalazi se u mapi `latex/`. Paket `minted` (za isticanje koda) zahtijeva `pdflatex` s opcijom `-shell-escape` i instaliran Python paket `Pygments`.
+
+### Preduvjeti
+
+```bash
+pip install Pygments
+```
+
+### Kompajliranje
+
+```bash
+cd latex
+pdflatex -shell-escape zavrsni_rad
+bibtex zavrsni_rad
+pdflatex -shell-escape zavrsni_rad
+pdflatex -shell-escape zavrsni_rad
+```
+
+Tri prolaza su potrebna da se ispravno razriješe sve reference i literatura.
+
+### Alternativno s latexmk
+
+Kreiraj datoteku `latex/.latexmkrc` sa sadržajem:
+
+```perl
+$pdflatex = "pdflatex -shell-escape %O %S";
+```
+
+Zatim:
+
+```bash
+cd latex
+latexmk -pdf zavrsni_rad
+```

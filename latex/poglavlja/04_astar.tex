@@ -5,7 +5,7 @@
 
 \section{A* algoritam}
 
-Prije nego NMPC može pratiti putanju, potrebno je tu putanju pronaći. A* algoritam pretražuje diskretiziranu mrežu prostora i pronalazi najkraći slobodan put od starta do cilja.
+Prije nego NMPC može pratiti putanju, potrebno je tu putanju pronaći. A* algoritam \cite{hart1968astar, lavalle2006planning} pretražuje diskretiziranu mrežu prostora i pronalazi najkraći slobodan put od starta do cilja.
 
 \subsection{Diskretizacija prostora}
 
@@ -38,7 +38,7 @@ for (cx, cy, r) in to_acados_list(obstacles):  # za svaku prepreku (centar + pol
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.75\linewidth]{figures/astar_grid.png}
-  \caption{Diskretizacija prostora i proširenje prepreke. Crvene ćelije su blokirane za A* jer im je centar unutar proširene zone (isprekidani krug). Robot (plavi krug) može se kretati samo centrom slobodnih ćelija, što garantira da nikada neće doći u fizički kontakt s preprekom.}
+  \caption{Diskretizacija prostora i proširenje prepreke. Crvene ćelije su blokirane za A* jer im je centar unutar proširene zone (isprekidani krug). Robot (plavi krug) može se kretati samo centrom slobodnih ćelija, što osigurava da A* putanja ostaje izvan sigurnosne zone prepreka.}
   \label{slk:astar_grid}
 \end{figure}
 
@@ -56,7 +56,7 @@ gdje je $g(n)$ stvarni trošak puta od starta do čvora $n$, a $h(n)$ euklidska 
   h(n) = \sqrt{(n_x - g_x)^2 + (n_y - g_y)^2}
 \end{equation}
 
-Algoritam uvijek proširuje čvor s najmanjim $f(n)$. Euklidska heuristika nikad ne precjenjuje stvarni trošak, što garantira pronalazak optimalnog puta. Susjedi se razmatraju u 8 smjerova --- 4 kardinalna (trošak 1,0) i 4 dijagonalna (trošak $\sqrt{2}$).
+Algoritam uvijek proširuje čvor s najmanjim $f(n)$. Euklidska heuristika nikad ne precjenjuje stvarni trošak, što garantira pronalazak najkraćeg puta na diskretnoj rešetki. Susjedi se razmatraju u 8 smjerova --- 4 kardinalna (trošak 1,0) i 4 dijagonalna (trošak $\sqrt{2}$).
 
 Kada A* prođe kroz sve dostupne ćelije i ne pronađe put do cilja, program javlja grešku --- to znači da put ne postoji:
 
@@ -109,6 +109,8 @@ def to_circles(self, r: float = 0.2) -> list[Circle]:
 \caption{Aproksimacija pravokutnika mrežom kružnica u \texttt{src/obstacles.py}}
 \end{listing}
 
+Razmak između centara susjednih kružnica iznosi $1{,}5 \cdot r = 0{,}3$ m, pa je razmak između rubova susjednih kružnica $0{,}3 - 2 \cdot 0{,}2 = -0{,}1$ m --- kružnice se preklapaju za $0{,}1$ m, što garantira da ne postoji prolaz kroz koji bi mogao proći robot polumjera $r_{rob} = 0{,}2$ m. Za scenarij L-hodnika ova shema daje \textbf{525 kružnica}, a za U-oblik (3 pravokutnika) \textbf{162 kružnice}. Taj broj postaje broj nelinearnih ograničenja prepreka u OCP-u, što utječe na CPU vrijeme solvera.
+
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.95\linewidth]{figures/rect_to_circles.png}
@@ -118,7 +120,7 @@ def to_circles(self, r: float = 0.2) -> list[Circle]:
 
 \section{Izglađivanje putanje}
 
-A* putanja sadrži oštre kutove jer je ograničena rešetkom. Takva putanja nije pogodna kao referenca za NMPC jer zahtijeva nagle promjene smjera. Stoga se izglađuje \textbf{kubičnim B-splineom} koristeći \texttt{scipy.interpolate.splprep}:
+A* putanja sadrži oštre kutove jer je ograničena rešetkom. Takva putanja nije pogodna kao referenca za NMPC jer zahtijeva nagle promjene smjera. Stoga se izglađuje \textbf{kubnim B-splineom} koristeći funkciju \texttt{splprep} iz biblioteke SciPy \cite{virtanen2020scipy}:
 
 \begin{listing}[H]
 \begin{minted}{python}
@@ -130,6 +132,29 @@ x_s, y_s = splev(t, tck)
 \end{listing}
 
 Parametar izglađivanja $s = 0{,}5$ dopušta B-spline krivulji da ne prolazi točno kroz sve A* točke, nego pronalazi glađu krivu koja eliminira sitne oscilacije rešetke. Rezultat je 200 ravnomjerno raspoređenih točaka duž glatke krivulje.
+
+Budući da B-spline s $s > 0$ ne prolazi točno kroz A* točke, izglađena krivulja može se teoretski primaknuti prepreci bliže od izvorne diskretne putanje. Zbog toga se nakon izglađivanja provjerava minimalna udaljenost svake od 200 točaka od svih prepreka. Ako je minimalna udaljenost manja od $r_{rob} = 0{,}2$ m, parametar $s$ se smanjuje i izglađivanje se ponavlja (redoslijed: $s = 0{,}5 \to 0{,}3 \to 0{,}1 \to 0{,}0$); pri $s = 0$ spline interpolira točno kroz A* točke koje su po konstrukciji u sigurnoj zoni.
+
+U svim testiranim scenarijima prvi prolaz s $s = 0{,}5$ prošao je bez kršenja. Minimalne izmjerene udaljenosti izglađene putanje od ruba prepreka prikazane su u tablici~\ref{tab:clearance}.
+
+\begin{table}[H]
+\centering
+\caption{Minimalna udaljenost izglađene B-spline putanje od ruba prepreke po scenariju}
+\label{tab:clearance}
+\begin{tabular}{ll}
+\toprule
+Scenarij & Min.\ udaljenost [m] \\
+\midrule
+\texttt{one\_obstacle} & $0{,}357$ \\
+\texttt{narrow}        & $0{,}348$ \\
+\texttt{l\_corridor}   & $0{,}229$ \\
+\texttt{u\_shape}      & $0{,}304$ \\
+\texttt{cluttered}     & $0{,}296$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Najmanji razmak postiže se u scenariju L-hodnika ($0{,}229$ m), gdje B-spline "reže" unutarnji kut zida --- no i ta vrijednost premašuje polumjer robota $r_{rob} = 0{,}2$ m, pa u eksperimentima nije zabilježeno narušavanje sigurnosne udaljenosti.
 
 \begin{figure}[H]
   \centering

@@ -5,7 +5,7 @@
 
 \section{Pregled postignutih rezultata}
 
-U ovom radu razvijen je dvoslojni sustav za planiranje i praćenje putanje mobilnog robota u poznatom statičkom prostoru. Globalni sloj temelji se na A* algoritmu koji pretražuje diskretiziranu mrežu rezolucije $0{,}2$ m uz ukupnu inflaciju prepreka $0{,}4$ m, a dobivena putanja se izglađuje uz prilagodbu brzine zakrivljenosti. Lokalni sloj koristi NMPC regulator s proširenim modelom jednokolice i SQP\_RTI solverom koji na svakom uzorkovnom koraku od $\Delta t = 0{,}1$ s rješava OCP s horizontom $N = 20$ koraka.
+U ovom radu razvijen je dvoslojni sustav za planiranje i praćenje putanje mobilnog robota u poznatom statičkom prostoru. Globalni sloj temelji se na A* algoritmu koji pretražuje diskretiziranu mrežu rezolucije $0{,}2$ m uz ukupnu inflaciju prepreka $0{,}4$ m, a dobivena putanja se izglađuje uz vizualizacijski profil brzine prilagođen zakrivljenosti. Lokalni sloj koristi NMPC regulator s proširenim modelom monocikla i SQP\_RTI solverom koji na svakom uzorkovnom koraku od $\Delta t = 0{,}1$ s rješava OCP s horizontom $N = 20$ koraka.
 
 Sustav je testiran na sedam scenarija koji pokrivaju spektar od jednostavne ravne putanje do gusto popunjene okoline i namjerno zadanog poremećaja stanja. Svi scenariji završili su uspješnim dosezanjem cilja, s RMSE od $34{,}4$ do $72{,}4$ mm u statičkim scenarijima i prosječnim CPU vremenom od $0{,}089$ do $0{,}118$ ms po koraku.
 
@@ -25,7 +25,7 @@ Prosječno CPU vrijeme kreće se od $0{,}089$ do $0{,}118$ ms po koraku, što je
 
 \subsection*{Analiza osjetljivosti parametara}
 
-Analiza horizonta $N$ otkriva zasićenje preciznosti za $N \geq 10$ (RMSE $\approx 43$--$47$ mm), dok CPU raste gotovo linearno. Odabrani $N = 20$ ($0{,}305$ ms/korak) postiže $33$\% manji CPU od $N = 30$ uz manje od $3$ mm razlike u RMSE. Analiza pondera $Q/R$ pokazuje da što je $Q$ veći u odnosu na $R$, robot preciznije prati putanju. Konfiguracija Q$<$R rezultira najlošijim RMSE ($272{,}9$ mm) jer robot tada više kažnjava agresivno skretanje nego grešku pozicije.
+Analiza horizonta $N$ otkriva zasićenje preciznosti za $N \geq 10$ (RMSE $\approx 43$--$47$ mm), dok CPU raste gotovo linearno. Odabrani $N = 20$ ($0{,}305$ ms/korak) postiže $33$\% manji CPU od $N = 30$ uz manje od $3$ mm razlike u RMSE. Analiza težina $Q/R$ pokazuje da što je $Q$ veći u odnosu na $R$, robot preciznije prati putanju. Konfiguracija Q$<$R rezultira najlošijim RMSE ($272{,}9$ mm) jer robot tada više kažnjava agresivno skretanje nego grešku pozicije.
 
 \section{Ograničenja implementiranog sustava}
 
@@ -33,11 +33,11 @@ Implementirani sustav počiva na nekoliko pretpostavki koje ograničavaju izravn
 
 \textbf{Poznata i statička okolina.} A* algoritam zahtijeva potpunu kartu okoline unaprijed. U dinamičkim okolinama s pokretnim preprekama potrebna je integracija senzorskog sustava i reaktivno replaniranje.
 
-\textbf{Kinematički model bez dinamike.} Model jednokolice zanemaruje inerciju i trenje kotača. Na visokim brzinama ili klizavim podlogama ova aproksimacija nije valjana i zahtijeva dinamički model.
+\textbf{Kinematički model bez dinamike.} Model monocikla zanemaruje inerciju i trenje kotača. Na visokim brzinama ili klizavim podlogama ova aproksimacija nije valjana i zahtijeva dinamički model.
 
 \textbf{Kružne prepreke.} Implementirana ograničenja prepreka pretpostavljaju kružni oblik. Prepreke proizvoljnog oblika zahtijevaju konveksnu aproksimaciju poligona ili pristup temeljen na polju predznačenih udaljenosti (SDF).
 
-\textbf{Simulacijsko okruženje.} Svi rezultati dobiveni su u simulaciji. Stvarni robot ima šum senzora, kašnjenje motora i trenje koje simulacija ne uključuje, pa su rezultati u praksi nešto lošiji.
+\textbf{Simulacijsko okruženje i identičan model.} Svi rezultati dobiveni su u simulaciji. Dodatno, NMPC predikcijski model i model koji simulira stvarnog robota su identični --- oba koriste isti kinematički model monocikla. Zbog toga NMPC "zna" točno kako će se robot ponašati, što daje gornju granicu preciznosti: izmjerene greške praćenja predstavljaju optimistični scenarij koji se na stvarnom robotu ne može dosegnuti. Na stvarnom hardveru prisutni su šum senzora, kašnjenje aktuatora i trenje koje uzrokuju odstupanje od predikcijskog modela, pa je stvarna preciznost praćenja nešto lošija.
 
 \section{Smjernice za buduća istraživanja}
 
@@ -47,12 +47,12 @@ Na temelju postignutih rezultata i identificiranih ograničenja, predlažu se sl
   \item \textbf{Dinamičke prepreke i reaktivno replaniranje:} implementacija A* ponovnog planiranja putanje u stvarnom vremenu pri detekciji novih prepreka
   \item \textbf{Dinamički model robota:} uključivanje inercije i trenja u model kako bi simulacija bila bliža stvarnom ponašanju robota
   \item \textbf{Contouring MPC:} varijanta NMPC-a koja kažnjava bočno odstupanje i brzinu napredovanja po putanji umjesto praćenja diskretnih referentnih točaka
-  \item \textbf{Adaptivno podešavanje:} automatsko prilagođavanje pondera $Q$ i $R$ ovisno o trenutnoj situaciji, npr.\ agresivnije u zavojima i glađe na ravnom dijelu putanje
-  \item \textbf{Testiranje na stvarnom hardveru:} pokretanje sustava na Raspberry Pi ili sličnom računalu kako bi se potvrdilo da radi dovoljno brzo u stvarnim uvjetima
+  \item \textbf{Adaptivno podešavanje:} automatsko prilagođavanje težina $Q$ i $R$ ovisno o trenutnoj situaciji, npr.\ agresivnije u zavojima i glađe na ravnom dijelu putanje
+  \item \textbf{Testiranje na stvarnom hardveru:} pokretanje sustava na Raspberry Pi ili sličnom računalu kako bi se potvrdilo da radi dovoljno brzo u stvarnim uvjetima; pri tome bi trebalo implementirati i transformaciju $(v, \omega) \to (v_L, v_R)$ opisanu u odjeljku~\ref{sec:diff_drive} za naredbu motornim kontrolerima diferencijalnog robota
 \end{enumerate}
 
 \section{Završna ocjena}
 
-Kombinacija A* algoritma i NMPC-a pokazala se kao dobro rješenje za navigaciju mobilnog robota --- sustav precizno prati putanju, automatski se oporavlja od poremećaja i radi dovoljno brzo za primjenu u stvarnom vremenu. Za razliku od jednostavnijih regulatora koji reagiraju tek nakon što se greška dogodi, NMPC gleda unaprijed i pokušava spriječiti grešku dok se još može.
+Kombinacija A* algoritma i NMPC-a pokazala se kao dobro rješenje za navigaciju mobilnog robota --- sustav precizno prati putanju, automatski se oporavlja od poremećaja i radi unutar zahtjeva intervala uzorkovanja od 100 ms s rezervom od dva reda veličine. Za razliku od jednostavnijih regulatora koji reagiraju tek nakon što se greška dogodi, NMPC gleda unaprijed i pokušava spriječiti grešku dok se još može.
 
-Alat acados pri tome generira optimizirani kod automatski, što znači da nije potrebno duboko poznavanje numeričke matematike da bi se ovakav sustav implementirao. 
+Alat acados znatno pojednostavljuje implementaciju jer automatski generira efikasan solver iz zadane OCP formulacije, što oslobađa korisnika ručnog izvođenja derivacija i pisanja vlastitog solvera. 

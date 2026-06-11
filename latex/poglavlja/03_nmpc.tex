@@ -5,9 +5,9 @@
 
 \section{Što je MPC}
 
-MPC (\textit{Model Predictive Control}) na svakom koraku simulira što će se dogoditi u sljedećih $N$ koraka i odabire upravljanje koje minimizira grešku u tom budućem prozoru, uz poštivanje svih ograničenja.
+MPC (eng.\ \textit{Model Predictive Control}) \cite{rawlings2017mpc, borrelli2017predictive} na svakom koraku predviđa ponašanje sustava za sljedećih $N$ koraka i odabire upravljanje koje minimizira grešku u tom budućem prozoru, uz poštivanje svih ograničenja.
 
-Slično iskusnom vozaču koji gleda cestu 20 metara unaprijed i već sada počinje kočiti ili skretati --- umjesto da reagira tek kad je kasno.
+Analogno iskusnom vozaču koji gleda cestu 20 metara unaprijed: ne samo da uočava ono što dolazi, nego već sada planira buduće kočenje ili skretanje da problem riješi prije nego se pojavi.
 
 Konkretno, na svakom koraku:
 \begin{enumerate}
@@ -17,7 +17,7 @@ Konkretno, na svakom koraku:
   \item ponovi se u sljedećem koraku s novim mjerenjem
 \end{enumerate}
 
-Ovaj pristup se naziva klizni horizont (\textit{receding horizon}): horizont se stalno pomiče naprijed zajedno s robotom. Prednost je što svako novo mjerenje automatski ispravlja akumulirane greške ili vanjske poremećaje.
+Ovaj pristup se naziva klizni horizont (eng.\ \textit{receding horizon}): horizont se stalno pomiče naprijed zajedno s robotom. Prednost je što svako novo mjerenje automatski ispravlja akumulirane greške ili vanjske poremećaje.
 
 \begin{figure}[H]
   \centering
@@ -26,7 +26,7 @@ Ovaj pristup se naziva klizni horizont (\textit{receding horizon}): horizont se 
   \label{slk:receding_horizon}
 \end{figure}
 
-\textbf{Nelinearno MPC} (NMPC) je varijanta koja radi direktno s nelinearnim modelom. Jednokolica je nelinearna jer njezine jednadžbe kretanja sadrže $v\cos\theta$ i $v\sin\theta$ --- brzina i kut orijentacije su množeni, što sustav čini nelinearnim. Konkretno: robot koji vozi brzinom $v = 1$ m/s ravno ($\theta = 0$) kreće se isključivo u smjeru osi $x$, a isti robot koji vozi istom brzinom ali okrenut za $\theta = \pi/2$ kreće se isključivo u smjeru osi $y$ --- isti ulaz, potpuno drugačiji efekt ovisno o trenutnom stanju. Linearni sustav bi uvijek reagirao proporcionalno i predvidivo bez obzira na stanje, što ovdje nije slučaj. Zbog toga je potreban složeniji optimizacijski pristup poput SQP-a.
+\textbf{Nelinearni MPC} (NMPC) je varijanta koja radi direktno s nelinearnim modelom. Jednokolica je nelinearna jer njezine jednadžbe kretanja sadrže $v\cos\theta$ i $v\sin\theta$ --- brzina i kut orijentacije su množeni, što sustav čini nelinearnim. Konkretno: robot koji vozi brzinom $v = 1$ m/s ravno ($\theta = 0$) kreće se isključivo u smjeru osi $x$, a isti robot koji vozi istom brzinom ali okrenut za $\theta = \pi/2$ kreće se isključivo u smjeru osi $y$ --- isti ulaz, potpuno drugačiji efekt ovisno o trenutnom stanju. Da je sustav linearan, način na koji upravljanje utječe na promjenu stanja bio bi konstantan i neovisan o trenutnoj orijentaciji. U monociklu naprotiv, faktori $\cos\theta$ i $\sin\theta$ množe brzinu $v$ --- isti upravljački signal pri različitom $\theta$ daje potpuno drugačiji smjer promjene pozicije. Zbog toga je potreban nelinearni optimizacijski pristup poput SQP-a.
 
 \begin{figure}[H]
   \centering
@@ -34,6 +34,30 @@ Ovaj pristup se naziva klizni horizont (\textit{receding horizon}): horizont se 
   \caption{Lijevo: robot pri istoj brzini $v=1$ m/s ali različitim kutovima orijentacije --- smjer kretanja potpuno se mijenja ovisno o stanju. Desno: x-komponenta brzine $v_x = v\cos\theta$ u ovisnosti o kutu --- valovita krivulja, ne ravna crta, što znači da je sustav nelinearan.}
   \label{slk:unicycle_nonlinear}
 \end{figure}
+
+\section{Formulacija optimizacijskog problema}
+
+Cijeli NMPC problem može se zapisati kao optimizacijski problem s ograničenjima (OCP, eng.\ \textit{Optimal Control Problem}):
+
+\begin{equation}
+\label{eq:ocp}
+\begin{aligned}
+\min_{\substack{\mathbf{u}_0,\ldots,\mathbf{u}_{N-1} \\ \mathbf{s}_{0},\ldots,\mathbf{s}_{N-1}}} \quad
+  & \sum_{k=0}^{N-1} \bigl\|\mathbf{y}_k - \mathbf{y}_{ref,k}\bigr\|^2_{W}
+    + \bigl\|\mathbf{y}_N - \mathbf{y}_{ref,N}\bigr\|^2_{W_e}
+    + \sum_{k=0}^{N-1} \sum_i \bigl( w_L\, s_{i,k} + w_Q\, s_{i,k}^2 \bigr) \\
+\text{uz uvjet} \quad
+  & \mathbf{x}_{k+1} = \Phi(\mathbf{x}_k, \mathbf{u}_k), \quad k = 0,\ldots,N-1 \\
+  & \mathbf{x}_0 = \mathbf{x}_{meas} \\
+  & |a_{v,k}| \leq 0{,}5 \ \text{m/s}^2, \quad |\alpha_k| \leq 1{,}0 \ \text{rad/s}^2 \\
+  & 0{,}05 \leq v_k \leq 1{,}0 \ \text{m/s}, \quad |\omega_k| \leq 1{,}5 \ \text{rad/s} \\
+  & h_i(\mathbf{x}_k) + s_{i,k} \geq 0, \quad s_{i,k} \geq 0
+\end{aligned}
+\end{equation}
+
+gdje $\Phi(\mathbf{x}_k, \mathbf{u}_k)$ označava numerički integrator dinamike s korakom $\Delta t = 0{,}1$ s (konkretno ERK4 (eng.\ \textit{Explicit Runge-Kutta}, ERK) --- eksplicitna Runge-Kutta metoda 4.\ reda), $h_i(\mathbf{x}) = \|\mathbf{p} - \mathbf{c}_i\|_2 - r_i$ je udaljenost centra robota $\mathbf{p} = (x, y)$ od granice prepreke $i$ (centar $\mathbf{c}_i$, polumjer $r_i$), a $s_{i,k} \geq 0$ su slack varijable koje dopuštaju meka kršenja ograničenja prepreka uz kaznu $w_L = w_Q = 10^4$.
+
+Sljedeće sekcije opisuju detaljno svaki od sastavnih dijelova ovog problema.
 
 \section{Funkcija troška}
 
@@ -46,11 +70,11 @@ Na svakom koraku NMPC traži upravljačku sekvencu $\mathbf{u}_0, \ldots, \mathb
 gdje je $\mathbf{y}_k$ izlazni vektor koji kombinira stanja i upravljanje, a $\mathbf{y}_{ref,k}$ referentni vektor koji dolazi s A* putanje:
 
 \begin{equation}
-  \mathbf{y}_k = \begin{bmatrix} x_k \\ y_k \\ \theta_k \\ \Delta v_k \\ \Delta\omega_k \end{bmatrix}, \qquad
+  \mathbf{y}_k = \begin{bmatrix} x_k \\ y_k \\ \theta_k \\ a_{v,k} \\ \alpha_k \end{bmatrix}, \qquad
   \mathbf{y}_{ref,k} = \begin{bmatrix} x_{ref} \\ y_{ref} \\ \theta_{ref} \\ 0 \\ 0 \end{bmatrix}
 \end{equation}
 
-Nule na kraju $\mathbf{y}_{ref,k}$ znače da su željene promjene brzine nula --- robot treba mijenjati brzinu samo koliko je nužno za praćenje putanje. Matrica troška $W$ blok-dijagonalne je strukture:
+Nule na kraju $\mathbf{y}_{ref,k}$ znače da su željena ubrzanja nula --- robot treba mijenjati brzinu samo koliko je nužno za praćenje putanje. Matrica troška $W$ blok-dijagonalne je strukture:
 
 \begin{equation}
   W = \begin{bmatrix} Q & 0 \\ 0 & R \end{bmatrix}, \qquad
@@ -58,11 +82,30 @@ Nule na kraju $\mathbf{y}_{ref,k}$ znače da su željene promjene brzine nula --
   R = \begin{bmatrix} 0{,}1 & 0 \\ 0 & 0{,}1 \end{bmatrix}
 \end{equation}
 
-Omjer $Q/R = 100$ znači da je korekcija pozicije 100 puta važnija od glatkoće upravljanja. Terminalna matrica $W_e = Q$ kažnjava grešku na kraju horizonta istim ponderima.
+Omjer dijagonalnih elemenata $Q_{xx} / R_{a_v} = 10{,}0 / 0{,}1 = 100$ znači da je korekcija pozicije 100 puta važnija od glatkoće upravljanja. Terminalna matrica $W_e = Q$ kažnjava grešku na kraju horizonta istim težinama --- odabir $W_e = Q$ je heuristički i u praksi se pokazao stabilnim, no postoje i sofisticiranije metode (npr.\ rješavanje Riccatijeve jednadžbe).
 
 Ove vrijednosti nisu odabrane nasumično --- u poglavlju~\ref{pog:rezultati} prikazana je analiza kako različiti omjeri $Q/R$ utječu na preciznost praćenja.
 
-Izlazni vektor $\mathbf{y}_k$ dobiva se linearnom projekcijom stanja i upravljanja matricama $V_x$ i $V_u$: $\mathbf{y}_k = V_x \mathbf{x}_k + V_u \mathbf{u}_k$. Implementacija:
+Izlazni vektor $\mathbf{y}_k$ dobiva se linearnom projekcijom stanja i upravljanja: $\mathbf{y}_k = V_x \mathbf{x}_k + V_u \mathbf{u}_k$, gdje su projekcijske matrice:
+
+\begin{equation}
+  V_x = \begin{bmatrix}
+    1 & 0 & 0 & 0 & 0 \\
+    0 & 1 & 0 & 0 & 0 \\
+    0 & 0 & 1 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0
+  \end{bmatrix}, \qquad
+  V_u = \begin{bmatrix}
+    0 & 0 \\
+    0 & 0 \\
+    0 & 0 \\
+    1 & 0 \\
+    0 & 1
+  \end{bmatrix}
+\end{equation}
+
+Gornje tri komponente izlaza ($x$, $y$, $\theta$) dolaze iz vektora stanja, a donje dvije ($a_v$, $\alpha$) iz vektora upravljanja. Odgovarajuća implementacija u acadosu:
 
 \begin{listing}[H]
 \begin{minted}{python}
@@ -84,10 +127,10 @@ ocp.cost.W_e = Q                    # terminalna matrica = Q
 
 \section{Ograničenja}
 
-Sva fizikalna ograničenja robota direktno su ugrađena u optimizacijski problem. Ograničenja na upravljanje (maksimalne promjene brzine po koraku):
+Sva fizikalna ograničenja robota direktno su ugrađena u optimizacijski problem. Ograničenja na upravljanje (maksimalna ubrzanja):
 
 \begin{equation}
-  |\Delta v| \leq 0{,}5 \ \text{m/s}^2, \qquad |\Delta\omega| \leq 1{,}0 \ \text{rad/s}^2
+  |a_v| \leq 0{,}5 \ \text{m/s}^2, \qquad |\alpha| \leq 1{,}0 \ \text{rad/s}^2
 \end{equation}
 
 Ograničenja na stanja (fizikalne granice robota i okolina):
@@ -124,9 +167,19 @@ Za svaku kružnu prepreku s centrom $(c_x, c_y)$ i polumjerom $r$ definira se uv
 
 gdje je $r_{rob} = 0{,}2$ m polumjer robota. Ovaj uvjet mora biti zadovoljen za svaki korak horizonta.
 
-Istraživanjem ponašanja komercijalnih robotskih usisavača poput Ecovacs modela može se primijetiti da robot ne zaustavlja kretanje svaki put kada naiđe na prepreku --- u određenim situacijama, posebno pri ulasku u uske prostore, robot se lagano zabije u prepreku i nastavi kretanje. To nije greška u dizajnu, već namjerna odluka: upravo zbog toga usisavači imaju fizički branik sprijeda. Ova opservacija sugerira da i u softveru treba koristiti isti princip --- sustav treba \textit{preferirati} izbjegavanje prepreka, ali ne smije potpuno odbiti planirati put kada je slobodan prostor ograničen.
+Ograničenja su implementirana kao \textbf{meka} (eng.\ \textit{soft}): umjesto da se zahtijeva $h_i(\mathbf{x}_k) \geq 0$, uvodi se slack varijabla $s_{i,k} \geq 0$ i relaksirani uvjet postaje:
 
-Iz tog razloga ograničenja su implementirana kao \textbf{meka} (\textit{soft}): kršenje ograničenja je dopušteno, ali skupo. Kršenje se kažnjava dodatnim penalom u funkciji troška s koeficijentom $10^4$, što je dovoljno visoko da robot aktivno izbjegava prepreke, ali optimizacijski problem ostaje uvijek riješiv.
+\begin{equation}
+  h_i(\mathbf{x}_k) + s_{i,k} \geq 0, \qquad s_{i,k} \geq 0
+\end{equation}
+
+Kada je $s_{i,k} = 0$, ograničenje je zadovoljeno; kada je $s_{i,k} > 0$, robot je unutar sigurnosne zone prepreke $i$ i veličina $s_{i,k}$ mjeri iznos kršenja. Svaka slack varijabla kažnjava se u funkciji troška linearnim i kvadratnim penalom:
+
+\begin{equation}
+  \sum_{k=0}^{N-1} \sum_i \bigl( w_L\, s_{i,k} + w_Q\, s_{i,k}^2 \bigr), \qquad w_L = w_Q = 10^4
+\end{equation}
+
+Linearna komponenta pokreće robot iz prepreke čak i kod malih kršenja, a kvadratna brzo raste s većim kršenjima. Meka formulacija korisna je jer održava numeričku rješivost OCP-a u uskim prostorima i pri nesavršenim referencama --- tvrda ograničenja bi u takvim situacijama uzrokovala neriješivost solvera.
 
 \begin{listing}[H]
 \begin{minted}{python}
@@ -145,20 +198,27 @@ ocp.cost.Zl = penalty * np.ones(n_obs)        # kvadratni penalty
 
 \section{SQP\_RTI solver}
 
-Za rješavanje nelinearnog optimizacijskog problema na svakom koraku koristi se SQP\_RTI (\textit{Sequential Quadratic Programming --- Real-Time Iteration}) pristup unutar alata acados \cite{acados_docs}.
+Za rješavanje nelinearnog optimizacijskog problema na svakom koraku koristi se SQP\_RTI (eng.\ \textit{Sequential Quadratic Programming --- Real-Time Iteration}) pristup unutar alata acados \cite{verschueren2022acados, acados_docs, diehl2002rti}.
 
-SQP (\textit{Sequential Quadratic Programming}) je metoda optimizacije koja iterativno linearizira nelinearni problem i rješava niz kvadratičnih potprograma. SQP\_RTI je varijanta koja provodi \textbf{samo jednu iteraciju po koraku} i odmah primjenjuje rezultat, što ga čini pogodnim za primjene u stvarnom vremenu.
+SQP (eng.\ \textit{Sequential Quadratic Programming}) je metoda optimizacije koja iterativno linearizira nelinearni problem i rješava niz kvadratičnih potprograma. SQP\_RTI (eng.\ \textit{Real-Time Iteration}) je varijanta prilagođena za primjene u stvarnom vremenu i sastoji se od dvije faze koje se izmjenjuju u svakom regulacijskom koraku \cite{diehl2002rti}:
 
-Za rješavanje kvadratičnog potprograma unutar svake SQP iteracije koristi se HPIPM solver (\textit{High Performance Interior Point Method}) koji je optimiziran za strukturu MPC problema. Gaussova aproksimacija Hessiane (\textit{Gauss-Newton}) zamjenjuje drugu derivatu troška pozitivno semidefinitnom aproksimacijom, što ubrzava rješavanje QP-a.
+\begin{enumerate}
+  \item \textbf{Faza pripreme} (eng.\ \textit{preparation phase}): linearizacija dinamike duž trenutne trajektorije, izračun Jacobijana, kondenzacija kvadratičnog potprograma (eng.\ \textit{Quadratic Program}, QP) --- ove operacije odvijaju se \textit{unaprijed}, dok robot još izvršava prethodni upravljački signal.
+  \item \textbf{Faza povratne veze} (eng.\ \textit{feedback phase}): čim stigne novo mjerenje $\mathbf{x}_{meas}$, postavi se inicijalni uvjet i izvrši jedna SQP iteracija rješavanjem pripremljenog QP-a. Rezultat je novi upravljački signal koji se odmah šalje robotu.
+\end{enumerate}
 
-Ukupno vrijeme rješavanja po koraku izmjereno u eksperimentima iznosi između $0{,}09$ i $0{,}12$ ms --- daleko ispod vremenskog koraka od $100$ ms. Benchmarking je proveden s oba solvera (SQP\_RTI i SQP) te su u svim testiranim scenarijima postigli identične rezultate po RMSE i CPU vremenu.
+Zahvaljujući ovoj podjeli, kašnjenje između mjerenja i primjene upravljanja iznosi samo trajanje feedback faze (najmanji dio ukupnog računanja), dok se skuplja priprema odvija paralelno s izvođenjem prethodnog koraka.
+
+Za rješavanje kvadratičnog potprograma unutar svake SQP iteracije koristi se HPIPM rješavač (eng.\ \textit{High Performance Interior Point Method}) koji je optimiziran za strukturu MPC problema. Gauss-Newtonova aproksimacija hesijana zamjenjuje pravi hesijan Lagrangiana aproksimacijom $J^\top W J$, gdje je $J$ Jacobijan reziduala (razlika $\mathbf{y}_k - \mathbf{y}_{ref,k}$) kvadratne funkcije troška, a $W$ težinska matrica. Time se izbjegava skupo računanje drugih derivacija nelinearne dinamike i ograničenja uz cijenu blago slabije konvergencije --- za RTI shemu s jednom iteracijom po koraku to je prihvatljiv kompromis.
+
+Ukupno vrijeme rješavanja po koraku izmjereno u eksperimentima iznosi između $0{,}09$ i $0{,}12$ ms --- daleko ispod vremenskog koraka od $100$ ms, što ostavlja dovoljno prostora za opterećenje komunikacije i perifernih operacija.
 
 \begin{listing}[H]
 \begin{minted}{python}
 ocp.solver_options.nlp_solver_type = mpc["solver_type"]   # "SQP_RTI"
 ocp.solver_options.qp_solver       = "PARTIAL_CONDENSING_HPIPM"
 ocp.solver_options.hessian_approx  = "GAUSS_NEWTON"
-ocp.solver_options.integrator_type = "ERK"                # eksplicitni Runge-Kutta
+ocp.solver_options.integrator_type = "ERK"                # eksplicitni Runge-Kutta 4. reda
 ocp.solver_options.nlp_solver_max_iter = 50
 \end{minted}
 \caption{Konfiguracija SQP\_RTI solvera u \texttt{src/mpc\_solver.py}}

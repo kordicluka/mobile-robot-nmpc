@@ -3,13 +3,16 @@
 \chapter{Rezultati i evaluacija}
 \label{pog:rezultati}
 
-U ovom poglavlju prikazano je kako se sustav ponaša u praksi. Za svaki od sedam testnih scenarija prikazane su trajektorija robota, upravljački signali i greška praćenja, te su izmjereni pokazatelji kvalitete. Nakon toga analizirano je kako promjena dva ključna parametra sustava --- predikcijskog horizonta $N$ i pondera troška --- utječe na preciznost i brzinu izvođenja. Poglavlje završava tablicom usporedbe svih scenarija.
+U ovom poglavlju prikazano je kako se sustav ponaša u praksi. Za svaki od sedam testnih scenarija prikazane su trajektorija robota, upravljački signali i greška praćenja, te su izmjereni pokazatelji kvalitete. Nakon toga analizirano je kako promjena dva ključna parametra sustava --- predikcijskog horizonta $N$ i težina troška --- utječe na preciznost i brzinu izvođenja. Poglavlje završava tablicom usporedbe svih scenarija.
 
+\FloatBarrier
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Eksperimentalni postav}
 \label{sec:r_postav}
 
 Sva ispitivanja provedena su u simulacijskom okruženju implementiranom u Pythonu, korištenjem acados solvera za rješavanje OCP-a. Simulacijsko okruženje modelira ravnu površinu dimenzija $10\ \text{m} \times 10\ \text{m}$. Simulacija se odvija u zatvorenoj petlji s korakom uzorkovanja $\Delta t = 0{,}1$ s i završava kada robot dođe unutar $d_{tol} = 0{,}3$ m od cilja ili po isteku $k_{max} = 1000$ koraka. Metrike evaluacije definirane su u poglavlju~\ref{pog:implementacija}, a pregled testnih scenarija u tablici~\ref{tab:scenariji}.
+
+Sva mjerenja izvršena su na prijenosnom računalu s procesorom Intel Core 7 150U i 32 GB RAM-a, pod operacijskim sustavom Fedora 42 (Linux kernel 6.19.14). Korišteni softver: Python 3.13.13, acados 0.5.1, CasADi 3.7.2, SciPy 1.17.1; solver je kompajliran kompajlerom GCC 15.2.1. CPU vrijeme jednog koraka mjereno je funkcijom \texttt{time.perf\_counter()} neposredno oko poziva \texttt{solver.solve()} (prikazano u listingu u poglavlju~\ref{pog:implementacija}).
 
 Tablica~\ref{tab:params} prikazuje sve ključne parametre korištene u eksperimentima.
 
@@ -25,15 +28,15 @@ Skupina & Parametar & Oznaka & Vrijednost \\
  & Maksimalna brzina & $v_{max}$ & $1{,}0$ m/s \\
  & Minimalna brzina & $v_{min}$ & $0{,}05$ m/s \\
  & Maksimalna kutna brzina & $\omega_{max}$ & $1{,}5$ rad/s \\
- & Maks.\ promjena brzine & $\Delta v_{max}$ & $0{,}5$ m/s\textsuperscript{2} \\
- & Maks.\ promjena kut.\ brzine & $\Delta\omega_{max}$ & $1{,}0$ rad/s\textsuperscript{2} \\
+ & Maks.\ translacijsko ubrzanje & $a_{v,max}$ & $0{,}5$ m/s\textsuperscript{2} \\
+ & Maks.\ kutno ubrzanje & $\alpha_{max}$ & $1{,}0$ rad/s\textsuperscript{2} \\
 \midrule
 \textbf{NMPC} & Predikcijski horizont & $N$ & 20 koraka \\
  & Korak uzorkovanja & $\Delta t$ & $0{,}1$ s \\
- & Ponderi pozicije & $Q_x, Q_y$ & $10{,}0$ \\
- & Ponder orijentacije & $Q_\theta$ & $1{,}0$ \\
- & Terminalna matrica troška & $W_e$ & $Q$ \\
- & Ponderi upravljanja & $R_{\Delta v}, R_{\Delta\omega}$ & $0{,}1$ \\
+ & Težine pozicije & $Q_x, Q_y$ & $10{,}0$ \\
+ & Težina orijentacije & $Q_\theta$ & $1{,}0$ \\
+ & Terminalna težinska matrica & $W_e$ & $Q$ \\
+ & Težine upravljanja & $R_{a_v}, R_{\alpha}$ & $0{,}1$ \\
  & Vrsta ograničenja prepreka & — & meka (soft) \\
  & Vrsta solvera & — & SQP\_RTI \\
 \midrule
@@ -72,6 +75,7 @@ simulation:
 \caption{Ključni parametri u \texttt{config/params.yaml}}
 \end{listing}
 
+\FloatBarrier
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Osnovna putanja}
 \label{sec:r_baseline}
@@ -85,7 +89,7 @@ Scenarij osnovne putanje definira kretanje od $(0{,}5;\; 0{,}5)$ s orijentacijom
   \label{slk:baseline_traj}
 \end{figure}
 
-Slika~\ref{slk:baseline_traj} pokazuje da stvarna putanja gotovo u potpunosti prati referentnu. Jedino vidljivo odstupanje pojavljuje se na početku kretanja gdje robot s $\theta_0 = 0$ mora korigirati smjer prema dijagonalnom referentnom pravcu (kut $\approx 45°$). NMPC regulator ispravno prepoznaje taj zahtjev i robota glatko preusmjerava bez oscilacija.
+Slika~\ref{slk:baseline_traj} pokazuje da stvarna putanja prati referentnu s RMSE od $34{,}4$ mm. Jedino vidljivo odstupanje pojavljuje se na početku kretanja gdje robot s $\theta_0 = 0$ mora korigirati smjer prema dijagonalnom referentnom pravcu (kut $\approx 45°$). NMPC regulator ispravno prepoznaje taj zahtjev i robota glatko preusmjerava bez oscilacija.
 
 \begin{figure}[htbp]
   \centering
@@ -126,6 +130,7 @@ Dostigao cilj & Da \\
 
 RMSE od $34{,}4$ mm i srednja bočna greška od $10{,}7$ mm potvrđuju visoku kvalitetu praćenja. Prosječno CPU vrijeme od $0{,}091$ ms po koraku iznosi manje od $0{,}1$\% trajanja uzornog intervala od $100$ ms, što pokazuje da je sustav primjenjiv u stvarnim uvjetima gdje je vrijeme odziva ključno.
 
+\FloatBarrier
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Jedna prepreka}
 \label{sec:r_one_obstacle}
@@ -161,7 +166,7 @@ Slika~\ref{slk:one_obstacle_traj} pokazuje da robot prati referentnu putanju s v
 \label{tab:one_obstacle}
 \begin{tabular}{lll}
 \toprule
-Metrika & Vrijednost & Usporedba s baseline \\
+Metrika & Vrijednost & Usporedba s osnovnim \\
 \midrule
 RMSE & $0{,}0469$ m & $+36{,}1$\% \\
 CTE srednji & $0{,}0278$ m & $+160{,}7$\% \\
@@ -174,8 +179,9 @@ Dostigao cilj & Da & --- \\
 \end{tabular}
 \end{table}
 
-RMSE i CTE su veći nego u baseline scenariju jer putanja sada ima zavoj oko prepreke --- robot ne može trenutačno promijeniti smjer pa u krivini blago zaostaje za referencom. Unatoč tome, RMSE ostaje ispod $50$ mm, a CPU overhead ($+8{,}8$\%) je zanemariv.
+RMSE i CTE su veći nego u osnovnom scenariju jer putanja sada ima zavoj oko prepreke --- robot ne može trenutačno promijeniti smjer pa u krivini blago zaostaje za referencom. Unatoč tome, RMSE ostaje ispod $50$ mm, a dodatno CPU opterećenje ($+8{,}8$\%) je zanemarivo.
 
+\FloatBarrier
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Uski prolaz}
 \label{sec:r_narrow}
@@ -218,7 +224,7 @@ Slika~\ref{slk:narrow_traj} prikazuje karakteristični luk: robot se spušta pre
 \label{tab:narrow}
 \begin{tabular}{lll}
 \toprule
-Metrika & Vrijednost & Usporedba s baseline \\
+Metrika & Vrijednost & Usporedba s osnovnim \\
 \midrule
 RMSE & $0{,}0344$ m & $\approx 0$\% \\
 CTE srednji & $0{,}0270$ m & $+152{,}7$\% \\
@@ -231,8 +237,9 @@ Dostigao cilj & Da & --- \\
 \end{tabular}
 \end{table}
 
-Ostvareni RMSE ($34{,}4$ mm) jednak je onom iz baseline scenarija, a greška smjera ($1{,}59°$) je najmanji od svih scenarija. Razlog je jednostavan: robot kreće s početnom orijentacijom $\theta_0 = 0$ (prema desno) i cilj se nalazi upravo u tom smjeru, pa ne treba inicijalna korekcija kuta --- za razliku od baseline scenarija gdje je robot morao odmah skrenuti za $\approx 45°$.
+Ostvareni RMSE ($34{,}4$ mm) jednak je onom iz osnovnog scenarija, a greška smjera ($1{,}59°$) je najmanji od svih scenarija. Razlog je jednostavan: robot kreće s početnom orijentacijom $\theta_0 = 0$ (prema desno) i cilj se nalazi upravo u tom smjeru, pa ne treba inicijalna korekcija kuta --- za razliku od osnovnog scenarija gdje je robot morao odmah skrenuti za $\approx 45°$.
 
+\FloatBarrier
 % ─────────────────────────────────────────────────────────────────────────────
 \section{L-hodnik}
 \label{sec:r_lcorridor}
@@ -268,7 +275,7 @@ Kutna brzina dostiže $\omega_{min} \approx -1{,}0$ rad/s, što je blizu ograni�
 \label{tab:lcorridor}
 \begin{tabular}{lll}
 \toprule
-Metrika & Vrijednost & Usporedba s baseline \\
+Metrika & Vrijednost & Usporedba s osnovnim \\
 \midrule
 RMSE & $0{,}0724$ m & $+110{,}2$\% \\
 CTE srednji & $0{,}0457$ m & $+328{,}3$\% \\
@@ -281,15 +288,16 @@ Dostigao cilj & Da & --- \\
 \end{tabular}
 \end{table}
 
-Najveći inicijalni vrh greške ($0{,}285$ m) nastaje kombinacijom greške pozicije i greške smjera na startu --- robot stoji na $y = 1{,}0$ m s $\theta_0 = 0$, dok referentna putanja odmah skreće prema $y \approx 2{,}2$ m. Bez tog tranzijenata prosječna greška u oba segmenta hodnika bila bi usporediva s jednostavnijim scenarijima.
+Najveći inicijalni vrh greške ($0{,}285$ m) nastaje kombinacijom greške pozicije i greške smjera na startu --- robot stoji na $y = 1{,}0$ m s $\theta_0 = 0$, dok referentna putanja odmah skreće prema $y \approx 2{,}2$ m. Bez tog prijelaznog odziva prosječna greška u oba segmenta hodnika bila bi usporediva s jednostavnijim scenarijima.
 
+\FloatBarrier
 % ─────────────────────────────────────────────────────────────────────────────
 \section{U-oblik}
 \label{sec:r_ushape}
 
 Tri pravokutne prepreke formiraju slijepu ulicu otvorenu prema jugu: lijeva stranica, desna stranica i gornja stranica U-oblika. Robot polazi iz $(5{,}0;\; 0{,}5)$ s $\theta_0 = \pi/2$ i mora doseći cilj $(5{,}0;\; 9{,}5)$, koji se nalazi izravno iza gornje stranice U. Naivni pristup prema cilju odveo bi robota ravno u zamku.
 
-Scenarij demonstrira neophodnost dvoslojne arhitekture: A* koji vidi cijeli prostor odjednom pronalazi jedini prohodani put --- zaobilazeći U-oblik izvana s desne strane. NMPC s horizontom $N = 20$ (predikcija $= 2$ s) pak ne može sam zaključiti o topologiji zamke, pa bi bez globalne reference zaglaviti unutar U.
+Scenarij demonstrira neophodnost dvoslojne arhitekture: A* koji vidi cijeli prostor odjednom pronalazi jedini prohodani put --- zaobilazeći U-oblik izvana s desne strane. NMPC s horizontom $N = 20$ (predikcija $= 2$ s) pak ne može sam zaključiti o topologiji zamke, pa bi bez globalne reference mogao zaglaviti unutar U-oblika.
 
 \begin{figure}[htbp]
   \centering
@@ -318,7 +326,7 @@ Scenarij demonstrira neophodnost dvoslojne arhitekture: A* koji vidi cijeli pros
 \label{tab:ushape}
 \begin{tabular}{lll}
 \toprule
-Metrika & Vrijednost & Usporedba s baseline \\
+Metrika & Vrijednost & Usporedba s osnovnim \\
 \midrule
 RMSE & $0{,}0550$ m & $+59{,}8$\% \\
 CTE srednji & $0{,}0400$ m & $+274{,}5$\% \\
@@ -331,13 +339,14 @@ Dostigao cilj & Da & --- \\
 \end{tabular}
 \end{table}
 
-Uspješno dovršavanje ovog scenarija potvrđuje ispravnost dvoslojne arhitekture. RMSE od $55{,}0$ mm drugi je po redu (iza L-hodnika) jer svaki od tri zavoja nakratko podigne grešku, no između zavoja praćenje je na razini baseline scenarija.
+Uspješno dovršavanje ovog scenarija potvrđuje ispravnost dvoslojne arhitekture. RMSE od $55{,}0$ mm drugi je po redu (iza L-hodnika) jer svaki od tri zavoja nakratko podigne grešku, no između zavoja praćenje je na razini osnovnog scenarija.
 
+\FloatBarrier
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Poremećaj i oporavak}
 \label{sec:r_perturbation}
 
-Scenarij ispituje sposobnost oporavka sustava od nagle vanjske sile. Konfiguracija je identična baseline scenariju (ravna putanja od $(0{,}5;\; 5{,}0)$ do $(9{,}5;\; 5{,}0)$), s tom razlikom da se u koraku $k = 30$ ($t = 3{,}0$ s) stanje robota pomakne za $\Delta y = +1{,}0$ m. Poremećaj modelira nagli udarac --- događaj koji sustav ne može predvidjeti jer nije dio modela.
+Scenarij ispituje sposobnost oporavka sustava od nagle vanjske sile. Konfiguracija je identična osnovnom scenariju (ravna putanja od $(0{,}5;\; 5{,}0)$ do $(9{,}5;\; 5{,}0)$), s tom razlikom da se u koraku $k = 30$ ($t = 3{,}0$ s) stanje robota pomakne za $\Delta y = +1{,}0$ m. Poremećaj modelira nagli udarac --- događaj koji sustav ne može predvidjeti jer nije dio modela.
 
 \begin{figure}[htbp]
   \centering
@@ -384,6 +393,7 @@ Dostigao cilj & Da \\
 
 Visoki RMSE ($273{,}6$ mm) posljedica je isključivo jednog trenutačnog poremećaja. Ključni zaključak jest da NMPC u zatvorenoj petlji automatski ispravlja poremećaje --- nije implementirana nikakva posebna logika za detekciju ili oporavak. Sustav na svakom koraku prima stvarno stanje i rješava OCP prema naprijed, što samo po sebi generira korektivne akcije.
 
+\FloatBarrier
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Gusti raspored prepreka}
 \label{sec:r_cluttered}
@@ -400,11 +410,11 @@ Scenarij smješta sedam kružnih prepreka polumjera $0{,}6$--$0{,}8$ m na razli�
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.82\linewidth]{figures/cluttered_controls.png}
-  \caption{Upravljački profili u scenariju gustog rasporeda. Robot dosljedno održava brzinu oko $0{,}65$--$0{,}70$ m/s zbog profiliranja prema zakrivljenosti putanje.}
+  \caption{Upravljački profili u scenariju gustog rasporeda. Robot dosljedno održava brzinu oko $0{,}65$--$0{,}70$ m/s --- NMPC autonomno bira nižu brzinu pri navigaciji kroz zakrivljenu putanju.}
   \label{slk:cluttered_controls}
 \end{figure}
 
-Stvarna brzina dosljedno se zadržava ispod $v_{max} = 1{,}0$ m/s jer profil brzine izračunat prema zakrivljenosti ($v_{ref} = v_{max} / (1 + k\kappa)$) ispravno zaključuje da zakrivljena putanja između sedam prepreka ne dopušta vožnju punom brzinom.
+Stvarna brzina dosljedno se zadržava ispod $v_{max} = 1{,}0$ m/s jer NMPC autonomno bira nižu brzinu pri navigaciji kroz zakrivljenu putanju između sedam prepreka.
 
 \begin{figure}[htbp]
   \centering
@@ -419,7 +429,7 @@ Stvarna brzina dosljedno se zadržava ispod $v_{max} = 1{,}0$ m/s jer profil brz
 \label{tab:cluttered}
 \begin{tabular}{lll}
 \toprule
-Metrika & Vrijednost & Usporedba s baseline \\
+Metrika & Vrijednost & Usporedba s osnovnim \\
 \midrule
 RMSE & $0{,}0429$ m & $+24{,}5$\% \\
 CTE srednji & $0{,}0232$ m & $+116{,}9$\% \\
@@ -433,13 +443,14 @@ Dostigao cilj & Da & --- \\
 \end{tabular}
 \end{table}
 
-RMSE od $42{,}9$ mm je iznimno dobar rezultat za scenarij s najvećim brojem prepreka --- bolji od L-hodnika ($72{,}4$ mm) i U-oblika ($55{,}0$ mm). Razlog je glatka dijagonalna putanja bez naglih zavoja od $90°$. CPU overhead od $17{,}6$\% u odnosu na baseline potvrđuje da dodavanje sedam mekih ograničenja nema značajan utjecaj na računalni teret.
+RMSE od $42{,}9$ mm je iznimno dobar rezultat za scenarij s najvećim brojem prepreka --- bolji od L-hodnika ($72{,}4$ mm) i U-oblika ($55{,}0$ mm). Razlog je glatka dijagonalna putanja bez naglih zavoja od $90°$. Dodatno CPU opterećenje od $17{,}6$\% u odnosu na osnovni scenarij potvrđuje da dodavanje sedam mekih ograničenja nema značajan utjecaj na računalni teret.
 
+\FloatBarrier
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Analiza osjetljivosti: predikcijski horizont $N$}
 \label{sec:r_horizon}
 
-Predikcijski horizont $N$ temeljni je projektni parametar koji definira broj koraka unaprijed u OCP-u. Duži horizont teorijski omogućuje bolju anticipaciju, ali povećava dimenzionalnost optimizacijskog problema i time računalni trošak. Analiza je provedena za $N \in \{5,\ 10,\ 15,\ 20,\ 30,\ 40\}$ na scenariju s jednom preprekom.
+Predikcijski horizont $N$ temeljni je projektni parametar koji definira broj koraka unaprijed u OCP-u. Duži horizont teorijski omogućuje bolju predikciju, ali povećava dimenzionalnost optimizacijskog problema i time računalni trošak. Analiza je provedena za $N \in \{5,\ 10,\ 15,\ 20,\ 30,\ 40\}$ na scenariju s jednom preprekom.
 
 \begin{figure}[htbp]
   \centering
@@ -450,7 +461,7 @@ Predikcijski horizont $N$ temeljni je projektni parametar koji definira broj kor
 
 Rezultati na slici~\ref{slk:tuning_horizon} pokazuju tri zone:
 \begin{itemize}
-  \item \textbf{Kratki horizont ($N = 5$):} RMSE iznosi $95{,}7$ mm. Kratka predikcija ograničava anticipaciju zakrivljene putanje izbjegavanja prepreke.
+  \item \textbf{Kratki horizont ($N = 5$):} RMSE iznosi $95{,}7$ mm. Kratka predikcija ograničava predviđanje zakrivljene putanje izbjegavanja prepreke.
   \item \textbf{Prijelazna zona ($N = 10$--$20$):} RMSE naglo pada na $43{,}3$ mm pri $N = 10$, a zatim blago oscilira do $46{,}9$ mm pri $N = 20$.
   \item \textbf{Zasićena zona ($N = 30$--$40$):} RMSE se stabilizira na $\approx 44$ mm bez daljnjeg poboljšanja.
 \end{itemize}
@@ -475,8 +486,11 @@ $N$ & RMSE [mm] & CPU prosjek [ms] & Normalizirani CPU \\
 
 CPU raste gotovo linearno s $N$, što je konzistentno s teorijskim ponašanjem SQP\_RTI solvera čija složenost po iteraciji raste linearno s dimenzijom predikcijskog vektora. Odabir $N = 20$ temelji se na uravnoteženom kompromisu: u usporedbi s $N = 10$ postiže stabilniji RMSE, a u usporedbi s $N = 30$ razlika u RMSE manja je od $3$ mm uz $33$\% manji CPU.
 
+\textbf{Napomena o metodološkoj razlici CPU vrijednosti.} Vrijednosti CPU-a u tablici~\ref{tab:horizon} ($0{,}078$--$0{,}627$ ms) veće su od vrijednosti u scenariju jedne prepreke (tablica~\ref{tab:one_obstacle}, $0{,}099$ ms za $N=20$) iako je RMSE identičan ($46{,}9$ mm). Razlog je metodološka razlika: analiza horizonta pokrenuta je kao zaseban skript koji za svaki $N$ iznova inicijalizira \texttt{AcadosOcpSolver} i generira novi C kod solvera. Svaka inicijalizacija uključuje hladan start (\textit{cold start}) predikcijskog modela bez prethodno zagrijane JIT/kompajlerske predmemorije. Scenarijska usporedba koristi već kompajlirani solver, čiji su SQP\_RTI pozivi brži zahvaljujući zagrijanju predmemorije instrukacija i podataka. Apsolutne vrijednosti u tablici~\ref{tab:horizon} treba tumačiti kao gornju granicu CPU-a za hladni start pri promjeni konfiguracije, a ne kao radne vrijednosti u normalnom radu.
+
+\FloatBarrier
 % ─────────────────────────────────────────────────────────────────────────────
-\section{Analiza osjetljivosti: ponderi troška}
+\section{Analiza osjetljivosti: težine troška}
 \label{sec:r_weights}
 
 Omjer $Q/R$ temeljni je stupanj slobode koji određuje karakter NMPC-a: visoki $Q$ kažnjava grešku praćenja, visoki $R$ kažnjava agresivne promjene upravljanja. Testirana su četiri konfiguracijska profila uz konstantan $N = 20$:
@@ -490,7 +504,7 @@ Omjer $Q/R$ temeljni je stupanj slobode koji određuje karakter NMPC-a: visoki $
 
 \begin{table}[H]
 \centering
-\caption{Utjecaj konfiguracije pondera na preciznost praćenja}
+\caption{Utjecaj konfiguracije težina na preciznost praćenja}
 \label{tab:weights}
 \begin{tabular}{lllll}
 \toprule
@@ -504,10 +518,11 @@ Q$<$R & $1{,}0$ & $5{,}0$ & $272{,}9$ & Pasivno, neučinkovito \\
 \end{tabular}
 \end{table}
 
-Rezultati pokazuju monoton redosljed: preciznost praćenja raste s porastom omjera $Q/R$. Konfiguracija Q$\gg$R postiže najmanji RMSE ($41{,}5$ mm), no po cijenu agresivnijih upravljačkih akcija. Konfiguracija Q$<$R ($Q = 1{,}0$, $R = 5{,}0$) postiže daleko najlošiji RMSE ($272{,}9$ mm) jer optimizator ``bira'' manje upravljačkih akcija kako bi smanjio trošak $R$, što rezultira trajnom velikom greškom pozicije.
+Rezultati pokazuju monoton redoslijed: preciznost praćenja raste s porastom omjera $Q/R$. Konfiguracija Q$\gg$R postiže najmanji RMSE ($41{,}5$ mm), no po cijenu agresivnijih upravljačkih akcija. Konfiguracija Q$<$R ($Q = 1{,}0$, $R = 5{,}0$) postiže daleko najlošiji RMSE ($272{,}9$ mm) jer optimizator ``bira'' manje upravljačkih akcija kako bi smanjio trošak $R$, što rezultira trajnom velikom greškom pozicije.
 
 Zadana konfiguracija $Q = 10{,}0$, $R = 0{,}1$ (omjer $100{:}1$) odabrana je kao optimalno kompromisno rješenje koje postiže RMSE od $46{,}9$ mm uz upravljačke signale dovoljno glatke za mehanički sustav.
 
+\FloatBarrier
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Zbirna usporedba scenarija}
 \label{sec:r_summary}
@@ -536,9 +551,10 @@ Gusti raspored    & $0{,}0429$ & $0{,}0232$ & $3{,}43$ & $20{,}3$ & $0{,}107$ & 
 
 Svi scenariji završavaju uspješnim dosezanjem cilja. Isključivanjem scenarija poremećaja, RMSE ostalih scenarija kreće se u rasponu od $34{,}4$ mm do $72{,}4$ mm (faktor $2{,}1\times$), što je izvrsna preciznost za sustav koji se kreće brzinom do $1$ m/s.
 
-Prosječno CPU vrijeme iznosi između $0{,}089$ ms i $0{,}118$ ms, a maksimalni izmjereni korak traje $0{,}359$ ms --- što je oko $280\times$ brže od raspoloživog uzornog intervala od $100$ ms. Ovo eksperimentalno potvrđuje da je sustav primjenjiv u stvarnom vremenu i na hardveru s ograničenim procesorskim resursima. Uzimajući u obzir da acados generira optimizirani C kod namijenjen ugradbenim sustavima, realistična procjena je da bi solver radio unutar uzornog intervala i na platformama poput Raspberry Pi 4.
+Prosječno CPU vrijeme iznosi između $0{,}089$ ms i $0{,}118$ ms, a maksimalni izmjereni korak traje $0{,}359$ ms --- što je oko $280\times$ brže od raspoloživog uzornog intervala od $100$ ms. Ovo eksperimentalno potvrđuje da je sustav primjenjiv u stvarnom vremenu i na hardveru s ograničenim procesorskim resursima. Budući da acados generira optimizirani C kod namijenjen ugradbenim sustavima, opravdano je očekivati prihvatljivo vrijeme izvođenja i na slabijem hardveru poput Raspberry Pi 4 --- no to nije eksperimentalno verificirano u ovom radu i ostavlja se za budući rad (poglavlje~\ref{pog:zakljucak}).
 
 
+\FloatBarrier
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Nedostižni cilj --- granice sustava}
 \label{sec:r_blocked}
@@ -554,7 +570,7 @@ Efektivni polumjer svake prepreke pri A* pretraživanju iznosi $r + d_{inf} = 1{
   \label{slk:blocked_env}
 \end{figure}
 
-A* pretraživač iscrpljuje sve slobodne čvorove lijeve polovice i ispravno detektira da put ne postoji:
+A* ne pronalazi put i ispravno detektira neizvedivost --- heuristika ga vodi sve dok ne iscrpi sve dostupne čvorove na strani starta:
 
 \begin{listing}[H]
 \begin{minted}{bash}

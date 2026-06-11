@@ -3,16 +3,23 @@
 \chapter{Model mobilnog robota}
 \label{pog:model}
 
-\section{Kinematički model jednokolice}
+U ovom poglavlju opisuje se matematički model kretanja robota koji se koristi kroz cijeli rad. Važno je napomenuti da se radi o \textbf{kinematičkom} modelu --- model opisuje \textit{geometriju} kretanja (položaj, orijentacija, brzina) bez uzimanja u obzir masa, sila, momenata i inercije. Dinamički model, koji bi uključivao te efekte, bio bi znatno složeniji i izvan opsega ovog rada. Kinematički model je dovoljna aproksimacija za mobilnog robota koji se kreće po ravnoj podlozi pri malim brzinama.
 
-Robot je modeliran kao jednokolica --- najjednostavniji model dvodimenzionalnog kretanja. Model koristi translacijsku brzinu $v$ i kutnu brzinu $\omega$ kao apstrakciju kretanja, što ga čini prikladnim za diferencijalno upravljane robote poput robotskog usisavača gdje se smjer kretanja postiže razlikom brzina dva kotača.
-Stanje robota opisano je s pet veličina:
+Dodatno, model koristi apstrakciju \textbf{monocikla} (eng.\ \textit{unicycle}): upravljačke veličine su translacijska i kutna brzina tijela robota $(v, \omega)$, a ne brzine pojedinih kotača $(v_L, v_R)$. Ova apstrakcija je standardna u planiranju putanje i upravljanju mobilnim robotima; veza s fizičkim diferencijalnim pogonom opisana je u odjeljku~\ref{sec:diff_drive}.
+
+\section{Klasični kinematički model monocikla}
+
+U klasičnoj formulaciji monocikla \cite{lavalle2006planning} stanje robota opisano je s tri veličine:
 
 \begin{equation}
-  \mathbf{x} = \begin{bmatrix} x \\ y \\ \theta \\ v \\ \omega \end{bmatrix}
+  \mathbf{x}_{\text{klas}} = \begin{bmatrix} x \\ y \\ \theta \end{bmatrix}
 \end{equation}
 
-gdje su $x$ i $y$ koordinate robota u prostoru, $\theta$ kut orijentacije (mjeren od osi $x$, od $-\pi$ do $\pi$), $v$ translacijska brzina i $\omega$ kutna brzina.
+gdje su $x$ i $y$ koordinate robota u prostoru, a $\theta$ kut orijentacije (mjeren od osi $x$, od $-\pi$ do $\pi$). Kut $\theta$ je ciklička varijabla: kutovi $\theta$ i $\theta + 2\pi$ opisuju identičnu orijentaciju. U implementaciji se ograničenje $\theta \in [-\pi, \pi]$ eksplicitno postavlja kao stanjsko ograničenje solvera (hr.\ \textit{rješavač}), a referentni kut računa se funkcijom $\text{atan2}$ koja uvijek vraća vrijednost u istom rasponu. Time se izbjegava problem diskontinuiteta pri prijelazu $\theta = \pm\pi$, koji bi inače uzrokovao pogrešnu gradijentnu informaciju u kvadratnoj funkciji troška. Upravljačke veličine su translacijska brzina $v$ i kutna brzina $\omega$:
+
+\begin{equation}
+  \mathbf{u}_{\text{klas}} = \begin{bmatrix} v \\ \omega \end{bmatrix}
+\end{equation}
 
 Jednadžbe kretanja su:
 
@@ -20,16 +27,16 @@ Jednadžbe kretanja su:
   \dot{x} = v\cos\theta, \qquad \dot{y} = v\sin\theta, \qquad \dot{\theta} = \omega
 \end{equation}
 
-Ovo su standardne jednadžbe jednokolice. Robot se može kretati samo naprijed-nazad u smjeru u koji je okrenut --- ne može bočno. Zbog toga, ako se robot odmakne od referentne putanje, ne može jednostavno skliznuti natrag, nego mora okretanjem i vožnjom postupno korigirati poziciju i orijentaciju.
+Iz ovih jednadžbi vidljiva je ključna nelinearnost: isti $v$ daje potpuno drugačiji smjer promjene položaja ovisno o trenutnoj orijentaciji $\theta$ --- ovo je i razlog zašto je potreban nelinearni regulator. Vidljiva je i neholonomska priroda monocikla: robot se može gibati samo u smjeru u koji je okrenut, ne i bočno. Ako se odmakne od referentne putanje, mora okretanjem i vožnjom postupno korigirati poziciju i orijentaciju.
 
-\section{Prošireni model s inkrementalnim upravljanjem}
+\section{Prošireni model: ubrzanja kao upravljačke veličine}
 
-U osnovnom modelu jednokolice upravljačke veličine su direktno brzine $v$ i $\omega$. Međutim, u praksi robot ne može trenutačno promijeniti brzinu --- postoje fizikalna ograničenja na to koliko brzo se brzina može mijenjati. Ako bismo ta ograničenja pokušali direktno implementirati u NMPC-u s $v$ i $\omega$ kao upravljanjem, formulacija postaje komplicirana.
+U osnovnom modelu monocikla upravljačke veličine su direktno brzine $v$ i $\omega$. Međutim, u praksi robot ne može trenutačno promijeniti brzinu --- postoje fizikalna ograničenja na to koliko brzo se brzina može mijenjati. Ako bismo ta ograničenja pokušali direktno implementirati u NMPC-u s $v$ i $\omega$ kao upravljanjem, formulacija postaje komplicirana.
 
-Rješenje je jednostavno: umjesto da upravljamo direktno brzinama, upravljamo njihovim \textbf{promjenama} $\Delta v$ i $\Delta\omega$. Brzine $v$ i $\omega$ postaju dio vektora stanja, a upravljački vektor postaje:
+Rješenje je jednostavno: umjesto da upravljamo direktno brzinama, upravljamo translacijskim ubrzanjem $a_v = \dot{v}$ i kutnim ubrzanjem $\alpha = \dot{\omega}$. Brzine $v$ i $\omega$ postaju dio vektora stanja, a upravljački vektor postaje:
 
 \begin{equation}
-  \mathbf{u} = \begin{bmatrix} \Delta v \\ \Delta\omega \end{bmatrix}
+  \mathbf{u} = \begin{bmatrix} a_v \\ \alpha \end{bmatrix}
 \end{equation}
 
 Cijeli vektor stanja sada ima pet komponenti, a dinamika proširenog modela glasi:
@@ -40,15 +47,15 @@ Cijeli vektor stanja sada ima pet komponenti, a dinamika proširenog modela glas
     v\cos\theta \\
     v\sin\theta \\
     \omega \\
-    \Delta v \\
-    \Delta\omega
+    a_v \\
+    \alpha
   \end{bmatrix}
 \end{equation}
 
-Prednost ovog pristupa je što ograničenja na brzinu promjene postaju jednostavna intervalna ograničenja na upravljanje:
+Prednost ovog pristupa je što fizikalna ograničenja na ubrzanje postaju jednostavna intervalna ograničenja na upravljanje:
 
 \begin{equation}
-  |\Delta v| \leq 0{,}5 \ \text{m/s}^2, \qquad |\Delta\omega| \leq 1{,}0 \ \text{rad/s}^2
+  |a_v| \leq 0{,}5 \ \text{m/s}^2, \qquad |\alpha| \leq 1{,}0 \ \text{rad/s}^2
 \end{equation}
 
 A ograničenja na same iznose brzina postaju intervalna ograničenja na stanja:
@@ -59,7 +66,7 @@ A ograničenja na same iznose brzina postaju intervalna ograničenja na stanja:
 
 Minimalna brzina $v_{min} = 0{,}05$ m/s osigurava da robot uvijek napreduje prema cilju --- bez te granice, optimizator bi u složenim situacijama mogao odabrati zaustavljanje kao lokalni optimum i robot bi zaostao iza referentne putanje koja kontinuirano napreduje.
 
-Implementacija modela koristi CasADi \cite{casadi} --- biblioteku za simboličku matematiku. Umjesto računanja s konkretnim brojevima, CasADi radi sa simboličkim varijablama poput $x$, $\theta$, $v$ iz kojih automatski izvodi derivacije potrebne za optimizaciju. To znači da dinamički model trebamo napisati samo jednom, a acados iz njega sam generira optimizirani C kod solvera bez ručnog računanja Jacobijana. Alternativa bi bila ručno izvođenje parcijalnih derivacija, no CasADi taj postupak čini bržim i jednostavnijim za promjene modela.
+Implementacija modela koristi CasADi \cite{andersson2019casadi, casadi_web} --- biblioteku za simboličku matematiku. Umjesto računanja s konkretnim brojevima, CasADi radi sa simboličkim varijablama poput $x$, $\theta$, $v$ iz kojih automatski izvodi derivacije potrebne za optimizaciju. To znači da dinamički model trebamo napisati samo jednom, a acados iz njega sam generira optimizirani C kod solvera bez ručnog računanja Jacobijana. Alternativa bi bila ručno izvođenje parcijalnih derivacija, no CasADi taj postupak čini bržim i jednostavnijim za promjene modela.
 
 \begin{listing}[H]
 \begin{minted}{python}
@@ -74,12 +81,12 @@ model.f_expl_expr = ca.vertcat(
     domega,              # domega/dt
 )
 \end{minted}
-\caption{Implementacija proširenog modela jednokolice u \texttt{src/model.py}}
+\caption{Implementacija proširenog modela monocikla u \texttt{src/model.py}}
 \end{listing}
 
 \section{Numerička integracija — metoda Runge-Kutta 4. reda}
 
-NMPC regulator interno rješava optimizacijski problem, ali nam je potrebna i odvojena numerička metoda za simulaciju "pravog robota" koji slijedi upravljačke naredbe. U tu svrhu koristi se metoda Runge-Kutta 4. reda (RK4).
+NMPC regulator interno rješava optimizacijski problem, ali nam je potrebna i odvojena numerička metoda za simulaciju "pravog robota" koji slijedi upravljačke naredbe. U tu svrhu koristi se metoda Runge-Kutta 4. reda (RK4) --- standardna metoda numeričke integracije za sustave diferencijalnih jednadžbi \cite{hairer1993ode}.
 
 RK4 aproksimira kretanje robota kroz jedan vremenski korak $\Delta t = 0{,}1$ s na sljedeći način:
 
@@ -99,4 +106,21 @@ RK4 aproksimira kretanje robota kroz jedan vremenski korak $\Delta t = 0{,}1$ s 
   \mathbf{x}_{k+1} = \mathbf{x}_k + \frac{\Delta t}{6}(k_1 + 2k_2 + 2k_3 + k_4)
 \end{equation}
 
-RK4 je odabran kao standardna metoda numeričke integracije koja se široko koristi u simulacijama dinamičkih sustava. Tijekom razvoja testirana je i Eulerova metoda, no rezultati su bili gotovo identični RK4-u, a ponekad s većim odstupanjima nego što bi teorija sugerirala. Iz tog razloga u konačnoj implementaciji zadržan je samo RK4. Implementacija u \texttt{src/simulation.py} direktno odgovara gornjim jednadžbama i koristi isti $f$ kao i model definiran u \texttt{src/model.py}, čime je osigurana konzistentnost između simulacije i predikcijskog modela u NMPC-u.
+RK4 je odabran kao standardna metoda numeričke integracije koja se široko koristi u simulacijama dinamičkih sustava. Tijekom razvoja testirana je i Eulerova metoda, no rezultati su bili gotovo identični RK4-u pa je u konačnoj implementaciji zadržan samo RK4. Implementacija u \texttt{src/simulation.py} direktno odgovara gornjim jednadžbama i koristi isti $f$ kao i model definiran u \texttt{src/model.py}, čime je osigurana konzistentnost između simulacije i predikcijskog modela u NMPC-u.
+
+\section{Veza s diferencijalnim pogonom}
+\label{sec:diff_drive}
+
+Apstrakcija monocikla opisuje kretanje upravljačkim veličinama $(v, \omega)$, ali fizički diferencijalno upravljani robot (dva neovisno pogonjena kotača) nema direktne aktutore za $v$ i $\omega$ --- pokretački signali su brzine pojedinih kotača $(v_L, v_R)$. Veza između ova dva opisa glasi \cite{siciliano2009robotics}:
+
+\begin{equation}
+  v = \frac{v_R + v_L}{2}, \qquad \omega = \frac{v_R - v_L}{L}
+\end{equation}
+
+gdje je $L$ razmak između kotača (eng.\ \textit{wheelbase}). Inverzna transformacija, potrebna za naredbu motorima:
+
+\begin{equation}
+  v_R = v + \frac{\omega L}{2}, \qquad v_L = v - \frac{\omega L}{2}
+\end{equation}
+
+U ovom radu ta transformacija nije implementirana jer je sustav u potpunosti simulacijski --- NMPC izračunava $(v, \omega)$ koji se direktno koriste kao ulaz u simulacijski model. Na stvarnom diferencijalnom robotu ova transformacija bila bi neophodna kao zadnji korak između izlaza regulatora i naredbi motornih kontrolera, uz poznavanje parametra $L$.

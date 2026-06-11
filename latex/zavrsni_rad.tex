@@ -8,8 +8,8 @@
 \usepackage{xcolor}
 \usepackage{subcaption}
 \usepackage{float}
+\usepackage{placeins}
 \usepackage{hyperref}
-\usepackage{siunitx}
 \usepackage{minted}
 
 % Stil za sve code listinge (minted)
@@ -43,7 +43,7 @@
 \zadatak{zadatak.pdf}
 
 \begin{zahvale}
-  % TODO
+Zahvaljujem mentoru izv.~prof.~dr.~sc.~Branimiru Novoselnik na usmjeravanju, korisnim komentarima i strpljenju tijekom izrade ovog rada.
 \end{zahvale}
 
 \mainmatter
@@ -67,18 +67,32 @@
 \bibliography{literatura}
 
 
+%--- IZJAVA O UI -------------------------------------------
+
+\begin{izjavaoui}
+
+Tijekom izrade ovog završnog rada korišten je generativni AI alat Claude (Anthropic, verzija Claude Sonnet). Alat je korišten kao pomoć pri programiranju (debugiranje Python koda i konfiguracija acados solvera), istraživanju i razumijevanju literature te razumijevanju matematičkih pojmova vezanih uz NMPC i numeričku optimizaciju.
+
+\paragraph{Osvrt na korištenje umjetne inteligencije:}
+Implementacija algoritama (A*, NMPC formulacija u acadosu), odabir metodologije, provedba eksperimenata i interpretacija rezultata rezultat su mog samostalnog rada. Sve tvrdnje, matematičke izvode i zaključke provjerio sam na primarnim izvorima i provjerio kroz simulaciju.
+\paragraph{Izjava o korištenju umjetne inteligencije:}
+Potvrđujem da sam tijekom izrade ovog završnog rada koristio umjetnu inteligenciju u skladu s Politikom primjerenog korištenja umjetne inteligencije na Fakultetu elektrotehnike i računarstva, te da umjetna inteligencija nije zamijenila moje kritičko razmišljanje niti moj doprinos.
+
+\end{izjavaoui}
+
+
 %--- SAŽETAK ---------------------------------------------
 
 \begin{sazetak}
-U radu je razvijen sustav za navigaciju mobilnog robota koji se kreće od zadane početne točke do cilja izbjegavajući prepreke. Sustav se sastoji od dva dijela: A* algoritma koji pronalazi slobodan put na mreži i NMPC regulatora koji taj put prati u stvarnom vremenu. Robot je modeliran kao jednokolica, a putanja se izglađuje kako bi kretanje bilo glatko. NMPC u svakom koraku optimizira kretanje robota uzimajući u obzir ograničenja brzine i prepreke u okolini. Za implementaciju je korišten alat acados koji automatski generira optimizirani kod solvera. Sustav je testiran na sedam scenarija različite složenosti --- od ravne putanje bez prepreka do gustog rasporeda sedam kružnih prepreka i scenarija s naglim bočnim guranjem robota. Svi scenariji završili su dosezanjem cilja. Greška praćenja iznosi $34{,}4$--$72{,}4$ mm, a prosječno vrijeme izračuna po koraku $0{,}089$--$0{,}118$ ms.
+U radu je razvijen sustav za navigaciju mobilnog robota koji se kreće od zadane početne točke do cilja izbjegavajući prepreke. Sustav se sastoji od dva dijela: A* algoritma koji pronalazi slobodan put na mreži i NMPC regulatora koji taj put prati u stvarnom vremenu. Robot je modeliran kao monocikl, a putanja se izglađuje kako bi kretanje bilo glatko. NMPC u svakom koraku optimizira kretanje robota uzimajući u obzir ograničenja brzine i prepreke u okolini. Za implementaciju je korišten alat acados koji automatski generira optimizirani kod solvera. Sustav je testiran na sedam scenarija različite složenosti --- od ravne putanje bez prepreka do gustog rasporeda sedam kružnih prepreka i scenarija s naglim bočnim guranjem robota. Svi scenariji završili su dosezanjem cilja. RMSE praćenja u statičkim scenarijima iznosi $34{,}4$--$72{,}4$ mm; u scenariju s perturbacijom ($\Delta y = 1{,}0$ m) RMSE iznosi $273{,}6$ mm, a robot se vraća na referencu unutar $2{,}2$ s. Prosječno vrijeme izračuna po koraku iznosi $0{,}089$--$0{,}118$ ms.
 \end{sazetak}
 
 \begin{kljucnerijeci}
-  mobilni robot; NMPC; planiranje putanje; acados; SQP\_RTI; A* algoritam; jednokolica
+  mobilni robot; NMPC; planiranje putanje; acados; SQP\_RTI; A* algoritam; monocikl
 \end{kljucnerijeci}
 
 \begin{abstract}
-This thesis presents a navigation system for a mobile robot that moves from a start position to a goal while avoiding obstacles. The system consists of two parts: an A* algorithm that finds a free path on a grid, and an NMPC controller that follows the path in real time. The robot is modelled as a unicycle and the path is smoothed to ensure fluid motion. At each step, the NMPC optimises the robot's movement while respecting speed limits and obstacle constraints. The implementation uses the acados framework, which automatically generates optimised solver code. The system was tested on seven scenarios of varying difficulty --- from a straight path with no obstacles to a cluttered environment with seven circular obstacles and a scenario with a sudden lateral push. All scenarios ended with the robot successfully reaching the goal. Path tracking RMSE ranges from $34.4$ to $72.4$ mm, and average computation time per step is $0.089$--$0.118$ ms.
+This thesis presents a navigation system for a mobile robot that moves from a start position to a goal while avoiding obstacles. The system consists of two parts: an A* algorithm that finds a free path on a grid, and an NMPC controller that follows the path in real time. The robot is modelled as a unicycle and the path is smoothed to ensure fluid motion. At each step, the NMPC optimises the robot's movement while respecting speed limits and obstacle constraints. The implementation uses the acados framework, which automatically generates optimised solver code. The system was tested on seven scenarios of varying difficulty --- from a straight path with no obstacles to a cluttered environment with seven circular obstacles and a scenario with a sudden lateral push. All scenarios ended with the robot successfully reaching the goal. Path tracking RMSE in static scenarios ranges from $34.4$ to $72.4$ mm; in the perturbation scenario, where a $1.0$ m lateral push is applied, RMSE reaches $273.6$ mm with full recovery within $2.2$ s. Average computation time per step is $0.089$--$0.118$ ms.
 \end{abstract}
 
 \begin{keywords}

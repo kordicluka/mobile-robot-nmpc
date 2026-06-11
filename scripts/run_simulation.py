@@ -51,13 +51,21 @@ def main():
 
         return
 
-    path = smooth(raw_path)
+    obs_list = to_acados_list(s["obstacles"])
+    path = smooth(raw_path, obstacles=obs_list)
 
     with open("config/params.yaml") as f:
-        v_max = yaml.safe_load(f)["robot"]["v_max"]
+        params = yaml.safe_load(f)
+        v_max = params["robot"]["v_max"]
+
+    if obs_list:
+        from src.path_smoother import _min_obstacle_dist
+        clearance = _min_obstacle_dist(path, obs_list)
+        print(f"  {len(raw_path)} → {len(path)} točaka (izglađeno), min. udaljenost od prepreka: {clearance:.4f} m")
+    else:
+        print(f"  {len(raw_path)} → {len(path)} točaka (izglađeno)")
 
     v_ref = velocity_profile(path, v_max)
-    print(f"  {len(raw_path)} → {len(path)} točaka (izglađeno)")
 
     print("Kreiram NMPC solver...")
 

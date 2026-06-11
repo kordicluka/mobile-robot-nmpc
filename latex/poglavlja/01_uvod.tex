@@ -5,36 +5,35 @@
 
 \section{Motivacija i kontekst}
 
-Robotski usisavači danas su jedan od najprodavanijih kućanskih uređaja s robotskom tehnologijom. Uređaji poput iRobot Roomba ili Ecovacs Deebot svakodnevno rješavaju zadatak autonomne navigacije u stambenom prostoru: kreću od baze za punjenje, pokrivaju čitavu površinu poda, izbjegavaju stolice, kućne ljubimce i stepenice, te se vraćaju na bazu kada završe ili im se isprazni baterija. Iza toga se, međutim, kriju dva klasična problema robotike: kako pronaći put od polazišta do cilja bez sudara s preprekama i kako robot stvarno prati taj put dovoljno precizno.
+Robotski usisavači su rašireni primjer komercijalnih autonomnih sustava. Uređaji poput iRobot Roomba ili Ecovacs Deebot svakodnevno rješavaju zadatak autonomne navigacije u stambenom prostoru: kreću od baze za punjenje, pokrivaju čitavu površinu poda, izbjegavaju stolice, kućne ljubimce i stepenice, te se vraćaju na bazu kada završe ili im se isprazni baterija. Iza toga se, međutim, kriju dva klasična problema robotike: kako pronaći put od polazišta do cilja bez sudara s preprekama i kako robot stvarno prati taj put dovoljno precizno.
 
-U ovom radu ta su dva problema riješena zajedno: izgrađen je sustav koji prvo planira put kroz prostor s preprekama, a zatim robot točno prati taj put. Koristi se model jednokolice --- jednostavan matematički opis kretanja robota koji dobro opisuje kako se kreće diferencijalno upravljani robot poput usisavača. Za razliku od problema poput uspravljanja njihala na kolicima gdje su sile i inercija neophodne za opis ponašanja sustava, istraživanjem je utvrđeno da za mobilnog robota koji se kreće po ravnoj podlozi pri malim brzinama takav model potpuno opisuje sve relevantne aspekte kretanja. Svi su eksperimenti provedeni u simulaciji u unaprijed poznatoj okolini.
+U ovom radu ta su dva problema riješena zajedno: izgrađen je sustav koji prvo planira put kroz prostor s preprekama, a zatim robot točno prati taj put. Koristi se model monocikla --- jednostavan matematički opis kretanja robota koji dobro opisuje kako se kreće diferencijalno upravljani robot poput usisavača. Za razliku od problema poput uspravljanja njihala na kolicima gdje su sile i inercija neophodne za opis ponašanja sustava, za male brzine i ravnu podlogu kinematički model je dovoljna aproksimacija za potrebe ovog rada. Svi su eksperimenti provedeni u simulaciji u unaprijed poznatoj okolini.
 
 \section{Pregled pristupa planiranju i regulaciji}
 
 \subsection{Planiranje putanje}
 
-Razvoj algoritama za planiranje putanje mobilnih robota proteže se kroz nekoliko desetljeća istraživanja. Najraniji pristupi temelje se na pretraživanju grafova u diskretiziranom prostoru. Dijkstrin algoritam garantira optimalnost ali ne koristi heurističku informaciju o cilju. \textbf{A* algoritam} \cite{redblobgames_astar}, uveden 1968.\ godine, dodaje procjenu preostale udaljenosti do cilja --- ravnu liniju do cilja --- i time značajno ubrzava pretraživanje uz zadržavanje optimalnosti. A* se danas smatra standardnim rješenjem za planiranje putanje u poznatim okolinama. Istraživanjem stvarnih robotskih sustava utvrđeno je da je A* široko zastupljen u praksi --- koristi se za planiranje putanje u ROS-u (\textit{Robot Operating System}), standardnoj platformi istraživačke robotike.
+Razvoj algoritama za planiranje putanje mobilnih robota traje desetljećima. Najraniji pristupi temelje se na pretraživanju grafova u diskretiziranom prostoru. Dijkstrin algoritam garantira optimalnost ali ne koristi heurističku informaciju o cilju. \textbf{A* algoritam} \cite{hart1968astar}, uveden 1968.\ godine, dodaje procjenu preostale udaljenosti do cilja --- ravnu liniju do cilja --- i time značajno ubrzava pretraživanje uz zadržavanje optimalnosti na diskretnoj rešetki \cite{lavalle2006planning}. A* je u širokoj primjeni, među ostalim u ROS-u (eng.\ \textit{Robot Operating System}), standardnoj platformi istraživačke robotike.
 
-Algoritam je posebno dobro obrađen na kolegiju Uvod u umjetnu inteligenciju na FER-u, što je dodatno učvrstilo razumijevanje njegovih svojstava i olakšalo primjenu u ovom radu.
 
 
 \subsection{Praćenje putanje}
 
-Problem praćenja putanje na prvi pogled izgleda jednostavno --- robot treba slijediti zadanu liniju. No mobilni robot poput jednokolice ima jedno ključno ograničenje: može se kretati samo u smjeru u koji je okrenut, ne i bočno. To znači da robot ne može jednostavno "skliznuti" na putanju ako se od nje odmakne, nego mora okretanjem i vožnjom naprijed postupno korigirati svoju poziciju i orijentaciju. Uz to, robot ima fizikalna ograničenja --- maksimalnu brzinu, maksimalnu kutnu brzinu i ograničenja na to koliko brzo može mijenjati te veličine.
+Problem praćenja putanje na prvi pogled izgleda jednostavno --- robot treba slijediti zadanu liniju. No mobilni robot poput monocikla ima jedno ključno ograničenje: može se kretati samo u smjeru u koji je okrenut, ne i bočno. To znači da robot se ne može bočno pomaknuti na putanju ako se od nje odmakne, nego mora okretanjem i vožnjom naprijed postupno korigirati svoju poziciju i orijentaciju. Uz to, robot ima fizikalna ograničenja --- maksimalnu brzinu, maksimalnu kutnu brzinu i ograničenja na to koliko brzo može mijenjati te veličine.
 
-Za praćenje generirane putanje postoje razni pristupi --- geometrijski regulatori poput Pure Pursuit i Stanley regulatora, PID regulatori i LQR. Svi su relativno jednostavni za implementaciju, ali zajednički im je nedostatak: ne gledaju unaprijed i ne uzimaju u obzir ograničenja sustava na formalan način.
+Za praćenje generirane putanje postoje razni pristupi --- geometrijski regulatori (Pure Pursuit \cite{coulter1992purepursuit}, Stanley), PID-regulatori i LQR. Svi su relativno jednostavni za implementaciju, ali zajednički im je nedostatak: ne gledaju unaprijed i ne uzimaju u obzir ograničenja sustava na formalan način.
 
-\textbf{Modelsko prediktivno upravljanje} (MPC) \cite{wiki_mpc} rješava upravo to: na svakom koraku gleda unaprijed kroz cijeli predikcijski horizont i optimizira upravljanje uz eksplicitno poštivanje svih ograničenja. \textbf{Nelinearno MPC} (NMPC) proširuje taj pristup na nelinearne sustave poput jednokolice. U ovom radu implementirano je korištenjem alata acados \cite{acados_docs}.
+\textbf{Modelsko prediktivno upravljanje} (eng.\ \textit{Model Predictive Control}, MPC) \cite{rawlings2017mpc, borrelli2017predictive} rješava upravo to: na svakom koraku gleda unaprijed kroz cijeli predikcijski horizont i optimizira upravljanje uz eksplicitno poštivanje svih ograničenja. \textbf{Nelinearni MPC} (NMPC) proširuje taj pristup na nelinearne sustave poput monocikla. U ovom radu implementirano je korištenjem alata acados \cite{verschueren2022acados, acados_docs}.
 
 \section{Doprinosi i opseg rada}
 
-U ovom radu izgrađen je sustav koji kombinira A* algoritam za planiranje putanje s NMPC regulatorom za model jednokolice. Cilj je bio razumjeti kako takav sustav radi u praksi i izmjeriti koliko je dobar u različitim situacijama.
+U ovom radu izgrađen je sustav koji kombinira A* algoritam za planiranje putanje s NMPC regulatorom za model monocikla. Cilj je bio razumjeti kako takav sustav radi u praksi i procijeniti učinkovitost takvog sustava u različitim situacijama.
 
 Konkretno, u radu je napravljeno:
 
 \begin{enumerate}
-  \item Prošireni model jednokolice u kojemu su promjene brzine upravljačke veličine, što olakšava postavljanje ograničenja u NMPC-u
-  \item Meka ograničenja izbjegavanja prepreka koja sprječavaju koliziju ali ne uzrokuju neriješivost optimizacijskog problema
+  \item Prošireni model monocikla u kojemu su ubrzanja ($a_v$, $\alpha$) upravljačke veličine, što olakšava postavljanje ograničenja u NMPC-u
+  \item Meka ograničenja izbjegavanja prepreka koja penaliziraju približavanje preprekama, ali ne uzrokuju neriješivost optimizacijskog problema
   \item Simulacijsko okruženje s testiranjem robustnosti na vanjske poremećaje i vizualizacijom rezultata
   \item Testiranje na sedam scenarija različite složenosti i analiza utjecaja ključnih parametara sustava
 \end{enumerate}

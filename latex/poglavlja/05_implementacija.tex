@@ -5,15 +5,15 @@
 
 \section{Arhitektura sustava}
 
-Sustav je implementiran u Pythonu i organiziran u module koji odgovaraju logičkim slojevima arhitekture. Svaki modul ima jasno definiran ulaz i izlaz bez globalnog stanja. Sve konfiguracijske vrijednosti --- dimenzije okoline, parametri robota, horizonti i ponderi MPC-a --- čitaju se iz jedne datoteke \texttt{config/params.yaml}, čime je odvojena konfiguracija od logike.
+Sustav je implementiran u Pythonu i organiziran u module koji odgovaraju logičkim slojevima arhitekture. Svaki modul ima jasno definiran ulaz i izlaz bez globalnog stanja. Sve konfiguracijske vrijednosti --- dimenzije okoline, parametri robota, horizonti i težine MPC-a --- čitaju se iz jedne datoteke \texttt{config/params.yaml}, čime je odvojena konfiguracija od logike.
 
 Izvršavanje počinje u \texttt{src/scenarios.py}, koji za odabrani scenarij vraća rječnik s početnim stanjem robota, koordinatama cilja i popisom prepreka. Prepreke su definirane u \texttt{src/obstacles.py} kao instance klasa \texttt{Circle} i \texttt{Rectangle}. Pravokutne prepreke se interno aproksimiraju mrežom malih kružnica kako bi bile kompatibilne s acados-ovim sustavom nelinearnih ograničenja koji očekuje analitičke izraze u obliku $h(\mathbf{x}) \geq 0$.
 
 Na temelju popisa prepreka i pozicija starta i cilja, \texttt{src/astar.py} gradi diskretiziranu mrežu okoline rezolucije $0{,}2$ m i markira sve čvorove koji su unutar infliranog radijusa prepreke kao zauzete. Algoritmom A* s euklidskom heuristikom i mogućnošću kretanja u osam smjerova pronalazi se kolizijsko-slobodna putanja u obliku niza čvorova mreže. Ako put ne postoji, algoritam baca iznimku i solver se ne pokreće.
 
-Putanja dobivena A* algoritmom potom ulazi u \texttt{src/path\_smoother.py}. Funkcija \texttt{smooth} uklanja duplikate točaka i aproksimira ih kubičnim B-splineom s parametrom glađenja $s{=}0{,}5$, uzorkovanim na $200$ ravnomjerno raspoređenih točaka. Funkcija \texttt{velocity\_profile} zatim za svaku točku izglađene putanje procjenjuje zakrivljenost iz promjene smjera susjednih segmenata i postavlja referentnu brzinu obrnuto proporcionalnu zakrivljenosti --- uski zavoji automatski dobivaju nižu referentnu brzinu.
+Putanja dobivena A* algoritmom potom ulazi u \texttt{src/path\_smoother.py}. Funkcija \texttt{smooth} uklanja duplikate točaka i aproksimira ih kubičnim B-splineom s parametrom glađenja $s{=}0{,}5$, uzorkovanim na $200$ ravnomjerno raspoređenih točaka. Funkcija \texttt{velocity\_profile} zatim za svaku točku izglađene putanje procjenjuje zakrivljenost iz promjene smjera susjednih segmenata i postavlja referentnu brzinu obrnuto proporcionalnu zakrivljenosti --- uski zavoji za potrebe vizualizacije dobivaju nižu prikazanu referentnu brzinu; NMPC autonomno bira stvarnu brzinu unutar $v_{min} \leq v \leq v_{max}$.
 
-Paralelno s planiranjem putanje, \texttt{src/model.py} definira simbolički CasADi model jednokolice koji se predaje modulu \texttt{src/mpc\_solver.py}. Solver pri inicijalizaciji kreira acados \texttt{AcadosOcp} objekt: postavlja matrice troška $Q$ i $R$, intervalna ograničenja na stanja i upravljanje te, ako scenarij ima prepreke, dodaje nelinearna ograničenja za svaku prepreku kao meko ograničenje s kaznenim faktorom $10^4$. Iz tog opisa acados generira i kompajlira optimizirani C kod solvera koji se koristi u simulaciji.
+Paralelno s planiranjem putanje, \texttt{src/model.py} definira simbolički CasADi model monocikla koji se predaje modulu \texttt{src/mpc\_solver.py}. Solver pri inicijalizaciji kreira acados \cite{verschueren2022acados} \texttt{AcadosOcp} objekt: postavlja matrice troška $Q$ i $R$, intervalna ograničenja na stanja i upravljanje te, ako scenarij ima prepreke, dodaje nelinearna ograničenja za svaku prepreku kao meko ograničenje s kaznenim faktorom $10^4$. Iz tog opisa acados generira i kompajlira optimizirani C kod solvera koji se koristi u simulaciji.
 
 Sama simulacija odvija se u \texttt{src/simulation.py} kao zatvorena petlja opisana u odjeljku~\ref{sec:simloop}. Nakon završetka simulacije, \texttt{src/metrics.py} iz zabilježenih stanja, upravljanja i vremena rješavanja izračunava RMSE, CTE, grešku smjera i CPU statistiku. Rezultati se vizualiziraju modulima \texttt{src/plot.py} i \texttt{src/animate.py}.
 
@@ -32,7 +32,7 @@ Tijek podataka kroz sustav prikazan je na slici~\ref{slk:architecture}.
 Srž sustava je simulacijska petlja u \texttt{src/simulation.py}. Na svakom koraku:
 
 \begin{enumerate}
-  \item pronađe se najbliži sljedeći waypoint na putanji
+  \item pronađe se najbliža sljedeća putna točka na putanji
   \item postavi se referenca $\mathbf{y}_{ref}$ za svih $N$ koraka horizonta
   \item fiksira se trenutno stanje kao početni uvjet OCP-a
   \item poziva se \texttt{solver.solve()} koji izvršava SQP\_RTI iteraciju
@@ -44,7 +44,7 @@ Srž sustava je simulacijska petlja u \texttt{src/simulation.py}. Na svakom kora
 \begin{listing}[H]
 \begin{minted}{python}
 for step in range(max_steps):
-    # napreduj do najbližeg sljedećeg waypointa
+    # napreduj do najbliže sljedeće putne točke
     while wp_idx < len(waypoints) - 1:
         if np.linalg.norm(x[:2] - waypoints[wp_idx+1]) \
                 <= np.linalg.norm(x[:2] - waypoints[wp_idx]):
@@ -55,6 +55,10 @@ for step in range(max_steps):
     # postavi referencu za N koraka unaprijed
     for k in range(N):
         ref_idx = min(wp_idx + k, len(waypoints) - 1)
+        xr, yr = waypoints[ref_idx]                    # koordinate ciljne putne točke
+        dx = waypoints[min(ref_idx+1, len(waypoints)-1)][0] - xr
+        dy = waypoints[min(ref_idx+1, len(waypoints)-1)][1] - yr
+        theta_ref = np.arctan2(dy, dx)                 # smjer putanje u toj točki
         solver.set(k, "yref", np.array([xr, yr, theta_ref, 0.0, 0.0]))
 
     # fiksiraj trenutno stanje kao početni uvjet
@@ -78,7 +82,7 @@ for step in range(max_steps):
   \label{slk:simulation_loop}
 \end{figure}
 
-Napredak po putanji određuje se usporedbom udaljenosti. Na svakom koraku algoritam izračunava $d_{curr} = \|\mathbf{p} - \mathbf{w}_{idx}\|$ i $d_{next} = \|\mathbf{p} - \mathbf{w}_{idx+1}\|$ te pomiče indeks naprijed sve dok vrijedi $d_{next} \leq d_{curr}$. Uvjet se provjerava u petlji pa robot može preskočiti više waypointova odjednom pri većim brzinama. Slika~\ref{slk:waypoint_tracking} ilustrira mehanizam: dok je robot blizu $w_2$, vrijedi $d_{next} \gg d_{curr}$ i indeks stoji; čim robot prijeđe polovicu puta prema $w_3$, sljedeći waypoint postaje bliži i indeks se pomiče. Na taj način referentna točka uvijek odgovara stvarnoj poziciji robota u prostoru.
+Napredak po putanji određuje se usporedbom udaljenosti. Na svakom koraku algoritam izračunava $d_{curr} = \|\mathbf{p} - \mathbf{w}_{idx}\|$ i $d_{next} = \|\mathbf{p} - \mathbf{w}_{idx+1}\|$ te pomiče indeks naprijed sve dok vrijedi $d_{next} \leq d_{curr}$. Uvjet se provjerava u petlji pa robot može preskočiti više putnih točaka odjednom pri većim brzinama. Slika~\ref{slk:waypoint_tracking} ilustrira mehanizam: dok je robot blizu $w_2$, vrijedi $d_{next} \gg d_{curr}$ i indeks stoji; čim robot prijeđe polovicu puta prema $w_3$, sljedeća putna točka postaje bliža i indeks se pomiče. Na taj način referentna točka uvijek odgovara stvarnoj poziciji robota u prostoru.
 
 \begin{figure}[H]
   \centering
@@ -91,7 +95,7 @@ Napredak po putanji određuje se usporedbom udaljenosti. Na svakom koraku algori
 
 Modul \texttt{src/metrics.py} izračunava četiri mjere kvalitete iz rezultata simulacije.
 
-\textbf{RMSE} (\textit{Root Mean Square Error}) mjeri prosječno odstupanje od referentne putanje:
+\textbf{RMSE} (eng.\ \textit{Root Mean Square Error}) mjeri prosječno odstupanje od referentne putanje:
 
 \begin{equation}
   \text{RMSE} = \sqrt{\frac{1}{K} \sum_{k=0}^{K-1} d_k^2}, \qquad d_k = \min_j \|\mathbf{p}_k - \mathbf{w}_j\|_2
@@ -108,7 +112,7 @@ d_k   = dists[idx]
 \caption{Izračun udaljenosti $d_k$ za RMSE u \texttt{src/metrics.py}}
 \end{listing}
 
-\textbf{CTE} (\textit{Cross-Track Error}) mjeri okomitu udaljenost od segmenta putanje --- za razliku od RMSE-a uzima u obzir smjer putanje:
+\textbf{CTE} (eng.\ \textit{Cross-Track Error}) mjeri okomitu udaljenost od segmenta putanje --- za razliku od RMSE-a uzima u obzir smjer putanje:
 
 \begin{equation}
   \text{CTE}_k = \left| (\mathbf{p}_k - \mathbf{w}_{j^*}) \times \hat{\mathbf{t}}_{j^*} \right|
@@ -126,13 +130,13 @@ cte      = abs(diff[0] * seg_norm[1] - diff[1] * seg_norm[0])
 \caption{Izračun CTE u \texttt{src/metrics.py}}
 \end{listing}
 
-\textbf{Greška smjera} (\textit{heading error}) je apsolutna kutna razlika između orijentacije robota i smjera putanje, izračunata korištenjem atan2 za ispravno rukovanje kutnim prelaskom:
+\textbf{Greška smjera} (eng.\ \textit{heading error}) je apsolutna kutna razlika između orijentacije robota i smjera putanje, izračunata korištenjem atan2 za ispravno rukovanje kutnim prelaskom:
 
 \begin{equation}
   e_{\theta,k} = \left| \text{atan2}(\sin(\theta_k - \theta_{ref,k}),\ \cos(\theta_k - \theta_{ref,k})) \right|
 \end{equation}
 
-Direktno oduzimanje kutova $\theta_k - \theta_{ref,k}$ nije ispravno jer rezultat može izaći iz intervala $(-\pi, \pi]$; atan2 formulation osigurava da greška uvijek ostaje unutar tog intervala.
+Direktno oduzimanje kutova $\theta_k - \theta_{ref,k}$ nije ispravno jer rezultat može izaći iz intervala $(-\pi, \pi]$; formulacija s funkcijom \texttt{atan2} osigurava da greška uvijek ostaje unutar tog intervala.
 
 \begin{listing}[H]
 \begin{minted}{python}
@@ -148,7 +152,7 @@ Geometrijska interpretacija sve tri mjere prikazana je na slici~\ref{slk:metrics
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.95\linewidth]{figures/metrics_concept.png}
-  \caption{Geometrijska interpretacija mjera kvalitete. Lijevo: RMSE mjeri udaljenost do najbližeg waypointa $w_{j^*}$ (crvena linija $d_k$), dok CTE mjeri okomitu udaljenost do segmenta putanje (zelena linija). Desno: greška smjera $e_\theta$ je kutna razlika između orijentacije robota $\theta$ i referentnog smjera putanje $\theta_{ref}$.}
+  \caption{Geometrijska interpretacija mjera kvalitete. Lijevo: RMSE mjeri udaljenost do najbliže putne točke $w_{j^*}$ (crvena linija $d_k$), dok CTE mjeri okomitu udaljenost do segmenta putanje (zelena linija). Desno: greška smjera $e_\theta$ je kutna razlika između orijentacije robota $\theta$ i referentnog smjera putanje $\theta_{ref}$.}
   \label{slk:metrics_concept}
 \end{figure}
 
@@ -165,7 +169,7 @@ solve_times.append(time.perf_counter() - t0)
 
 \section{Testni scenariji}
 
-Sustav je testiran na osam scenarija različite složenosti. Tablica~\ref{tab:scenariji} prikazuje njihove ključne karakteristike.
+Sustav je testiran na osam scenarija različite složenosti: sedam u kojima robot uspješno dostiže cilj te jedan (\texttt{blocked}) koji testira prepoznavanje neizvedivog puta. U preostalim poglavljima pojam ``sedam scenarija'' odnosi se na ovih sedam navigacijskih scenarija, isključujući \texttt{blocked}. Tablica~\ref{tab:scenariji} prikazuje ključne karakteristike svih osam scenarija.
 
 \begin{table}[H]
 \centering
